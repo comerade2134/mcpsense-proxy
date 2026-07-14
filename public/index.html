@@ -70,6 +70,19 @@
     </button>
   </form>
 </section>
+
+<!-- MCPSense Cloud block -->
+<section class="mt-20 max-w-2xl mx-auto text-center bg-slate-900/50 border border-slate-800 rounded-2xl p-8">
+  <h3 class="text-xl font-bold mb-2">☁️ MCPSense Cloud</h3>
+  <p class="text-sm text-slate-400 mb-6 leading-relaxed">The multi-tenant hosted bridge. Run legacy MCP servers as managed tenants behind a single endpoint, with per-tenant tokens, request logs, and optional Stripe-gated billing. Self-host it in minutes:</p>
+  <div class="bg-slate-950 border border-slate-800 rounded-lg p-4 text-left font-mono text-xs overflow-x-auto text-slate-300">
+    <div><span class="text-indigo-400">docker</span> build -t mcpsense-proxy .</div>
+    <div><span class="text-indigo-400">docker</span> run -d --name mcpsense-cloud -p 8080:8080 \</div>
+    <div class="pl-4">-v $(pwd)/data:/app/data -e REGISTER_KEY=&lt;strong-random&gt; \</div>
+    <div class="pl-4">-e REMOTE_EGRESS_ALLOWLIST=api.openai.com,api.anthropic.com mcpsense-proxy:latest</div>
+  </div>
+  <p class="text-xs text-slate-500 mt-4">Full deploy guide, env vars, and security notes in the <a href="#mcpsense-cloud-local-dev" class="text-indigo-400 hover:text-indigo-300 underline underline-offset-2">README Cloud section</a>.</p>
+</section>
 </main>
 
 <!-- Footer -->

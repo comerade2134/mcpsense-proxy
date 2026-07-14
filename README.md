@@ -157,6 +157,65 @@ REGISTER_KEY=your-dev-key PORT=8080 node bin/cloud/mcpsense-cloud.js
 
 State lives in `data/tenants.json` + `data/logs/<tenantId>.jsonl`.
 
+### Production deployment
+
+The cloud server is a single Node process behind any reverse proxy (nginx, Caddy, a
+container platform). Build the image once and run it with a persisted `/app/data` volume.
+
+#### Docker
+
+```bash
+docker build -t mcpsense-proxy .
+```
+
+```bash
+docker run -d --name mcpsense-cloud \
+  -p 8080:8080 \
+  -v $(pwd)/data:/app/data \
+  -e PORT=8080 \
+  -e REGISTER_KEY=<strong-random> \
+  -e REMOTE_EGRESS_ALLOWLIST=api.openai.com,api.anthropic.com \
+  mcpsense-proxy:latest
+```
+
+The container runs as the non-root `node` user, so the mounted volume must be writable
+by that UID (e.g. `chown -R 1000:1000 ./data` before first run).
+
+#### Environment variables
+
+| Var | Required | Default | Purpose |
+| `PORT` | no | `8080` | Listen port |
+| `REGISTER_KEY` | for stdio backends | — | Gate `stdio` registration (RCE guard) |
+| `REMOTE_EGRESS_ALLOWLIST` | recommended | (empty = block all literal private/loopback IPs, allow hostnames) | Comma-separated hosts/IPs allowed as `remote` backend targets |
+| `STRIPE_SECRET_KEY` | for paid mode | — | Enables paid gating; unset = free mode |
+| `STRIPE_WEBHOOK_SECRET` | with Stripe | — | Verifies webhooks |
+| `STRIPE_PRICE_ID` | with Stripe | — | Default price for checkout |
+| `PUBLIC_BASE_URL` | with Stripe | `https://comerade2134.github.io/mcpsense-proxy` | Base for the `checkout` link + same-origin `success_url` restriction |
+| `DATA_DIR` | no | `./data` | Tenant DB + logs (mount a volume) |
+
+#### Security notes
+
+- `stdio` registration requires `REGISTER_KEY`; without it, `POST /register` with a
+  `stdio` type is rejected (prevents RCE via command injection).
+- The container runs as the non-root `node` user.
+- `REMOTE_EGRESS_ALLOWLIST` **MUST** be set before exposing `/register` publicly.
+  Without it the egress filter allows hostnames but blocks literal private/loopback IPs
+  by design — set the allowlist to pin exactly the hosts your tenants may reach.
+- The `checkout` `success_url` is restricted to the origin of `PUBLIC_BASE_URL`, so a
+  caller cannot redirect a post-payment browser to an arbitrary external origin.
+
+#### Known limitations (be explicit)
+
+- **Single-instance only.** The store is a JSON file (`data/tenants.json`); there is no
+  multi-replica support. Run one container per deployment and keep its volume exclusive.
+- **DNS-rebinding on `remote` hostnames is NOT mitigated.** The allowlist matches the
+  registered hostname, not the IP it later resolves to. Register only hostnames you
+  trust, or pin them via `REMOTE_EGRESS_ALLOWLIST`.
+- **`checkout` has no auth.** Anyone who can reach `/billing/checkout` can start a Stripe
+  session. Acceptable for the thin slice; note it before public exposure.
+- **Tenants are not isolated accounts.** There is no multi-user dashboard or per-tenant
+  login — each tenant is just an internal record. True account isolation is v2.
+
 ## License
 
 MIT

@@ -117,11 +117,23 @@ async function handleCheckout(req: IncomingMessage, res: ServerResponse, reg: Te
   const body = await readJson(req);
   const { default: Stripe } = await import("stripe");
   const stripe = new Stripe(opts.stripeSecretKey);
+  const base = opts.publicBaseUrl ?? process.env.PUBLIC_BASE_URL ?? "https://comerade2134.github.io/mcpsense-proxy";
+  const requested = body.successUrl as string | undefined;
+  let successUrl = base;
+  if (typeof requested === "string" && requested.length > 0) {
+    try {
+      const rb = new URL(base);
+      const rr = new URL(requested);
+      if (rr.origin === rb.origin) successUrl = requested;
+    } catch {
+      /* keep default */
+    }
+  }
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     client_reference_id: body.tenantId as string,
     line_items: [{ price: (body.priceId as string) ?? process.env.STRIPE_PRICE_ID, quantity: 1 }],
-    success_url: (body.successUrl as string) ?? "https://comerade2134.github.io/mcpsense-proxy/?paid=1",
+    success_url: successUrl,
   });
   return json(res, 200, { url: session.url });
 }
