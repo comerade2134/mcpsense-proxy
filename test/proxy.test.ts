@@ -138,7 +138,7 @@ describe("mcpsense-proxy", () => {
     expect(events.length).toBe(2);
     expect(events[0].status).toBe(200);
     expect(events[0].method).toBe("tools/list");
-    expect(events[1].status).toBe(400);
+    expect(events[1].status).toBe(404);
   });
 });
 

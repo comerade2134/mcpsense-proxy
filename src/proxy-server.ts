@@ -253,7 +253,7 @@ export function createProxyHandler(manager: LegacyClientManager, options?: Proxy
       );
     } catch (err) {
       const rpcErr = err instanceof RpcError ? err : new RpcError(-32603, (err as Error).message ?? "Internal error");
-      const status = rpcErr.code === -32601 ? 400 : rpcErr.code === -32001 ? 400 : 500;
+      const status = rpcErr.code === -32601 ? 404 : rpcErr.code === -32001 ? 400 : 500;
       logger.error(
         { method: body.method, latencyMs: Date.now() - startTime, code: rpcErr.code, message: rpcErr.message },
         "request failed",
