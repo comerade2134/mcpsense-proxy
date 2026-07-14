@@ -68,7 +68,7 @@ npm run build && npm start -- -- node old-server.js
 If you need your legacy servers hosted securely in a managed, auto-scaling environment
 with centralized request logs and real-time spec-compliance alerts, join the waitlist.
 
-👉 **[Join the MCPSense Cloud Beta waitlist](https://mcpsense.example.com)** — or open an issue
+👉 **[Join the MCPSense Cloud Beta waitlist](https://comerade2134.github.io/mcpsense-proxy/)** — or open an issue
 titled **"Cloud waitlist"** at `https://github.com/comerade2134/mcpsense-proxy/issues`.
 
 ## ☁️ Going to Production? Meet MCPSense Cloud ($19/seat)
@@ -83,7 +83,7 @@ enterprise AI pipelines on a developer's laptop is a recipe for downtime.
 - **Compliance & Audit Logs:** Real-time logging of tool latency, status, and payload signatures (essential for security audits).
 - **Alerting:** Get notified before things break when clients roll out runtime updates.
 
-👉 **[Join the MCPSense Cloud Beta Waitlist](https://mcpsense.example.com)** to secure early access and lock in beta pricing.
+👉 **[Join the MCPSense Cloud Beta Waitlist](https://comerade2134.github.io/mcpsense-proxy/)** to secure early access and lock in beta pricing.
 
 ## License
 
