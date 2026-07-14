@@ -184,6 +184,7 @@ by that UID (e.g. `chown -R 1000:1000 ./data` before first run).
 #### Environment variables
 
 | Var | Required | Default | Purpose |
+| --- | --- | --- | --- |
 | `PORT` | no | `8080` | Listen port |
 | `REGISTER_KEY` | for stdio backends | — | Gate `stdio` registration (RCE guard) |
 | `REMOTE_EGRESS_ALLOWLIST` | recommended | (empty = block all literal private/loopback IPs, allow hostnames) | Comma-separated hosts/IPs allowed as `remote` backend targets |
