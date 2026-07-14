@@ -67,9 +67,23 @@ describe("cloud server", () => {
       method: "GET",
       headers: { authorization: `Bearer ${token}` },
     });
-    const lj = await logsRes.json();
-    expect(lj.logs.length).toBeGreaterThan(0);
-    expect(lj.logs[lj.logs.length - 1].method).toBe("tools/list");
+    const text = await logsRes.text();
+    const lines = text.split("\n").filter(Boolean);
+    expect(lines.length).toBeGreaterThan(0);
+    expect(JSON.parse(lines[lines.length - 1]).method).toBe("tools/list");
+    expect(logsRes.headers.get("content-type")).toContain("application/jsonl");
+  });
+
+  it("returns 200 with empty application/jsonl body for a tenant with no logs", async () => {
+    const reg = await post("/register", { type: "remote", url: remote.url });
+    const { endpoint, token } = await reg.json();
+    const logsRes = await fetch(base + endpoint.replace("/mcp", "/logs"), {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(logsRes.status).toBe(200);
+    expect(logsRes.headers.get("content-type")).toContain("application/jsonl");
+    expect((await logsRes.text())).toBe("");
   });
 
   it("health endpoint", async () => {

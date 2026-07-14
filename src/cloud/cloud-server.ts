@@ -1,5 +1,5 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { TenantRegistry, verifyToken, type TenantRecord } from "./tenant-registry.js";
 import { createProxyHandler } from "../proxy-server.js";
@@ -101,8 +101,9 @@ async function handleTenantLogs(req: IncomingMessage, res: ServerResponse, reg: 
   const gate = paymentGate(rec, opts, id);
   if (gate) return json(res, gate.status, gate.body);
   const p = reg.logPath(id);
-  const lines = existsSync(p) ? readFileSync(p, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : [];
-  return json(res, 200, { logs: lines.slice(-100) });
+  res.writeHead(200, { "Content-Type": "application/jsonl" });
+  if (!existsSync(p)) { res.end(); return; }
+  createReadStream(p).pipe(res);
 }
 
 async function handleCheckout(req: IncomingMessage, res: ServerResponse, reg: TenantRegistry, opts: CloudOptions): Promise<void> {
