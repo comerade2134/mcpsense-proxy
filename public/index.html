@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MCPSense — Prevent the July 28 MCP Stateless Breakage</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/asciinema-player@3.8.0/dist/asciinema-player.css" />
 </head>
 <body class="min-h-screen flex flex-col justify-between font-sans selection:bg-indigo-500 selection:text-white">
 
@@ -48,6 +49,15 @@
   </div>
 </div>
 
+<!-- Animated demo (asciinema player) -->
+<section class="mt-20 max-w-2xl mx-auto text-center">
+  <h3 class="text-xl font-bold mb-2">See it run</h3>
+  <p class="text-sm text-slate-400 mb-6">One command bridges a legacy MCP server to the 2026-07-28 stateless protocol.</p>
+  <div class="rounded-xl overflow-hidden border border-slate-800 bg-slate-950 text-left">
+    <asciinema-player src="terminal-demo.cast" cols="100" rows="34" autoplay loop theme="dracula" font-size="14px"></asciinema-player>
+  </div>
+</section>
+
 <!-- Waitlist Form (Connects to Formspree, Getform, or Tally) -->
 <section class="mt-20 max-w-md mx-auto text-center bg-gradient-to-b from-indigo-950/20 to-transparent border border-indigo-500/20 rounded-2xl p-8">
   <h3 class="text-xl font-bold mb-2">Join the MCPSense Cloud Beta</h3>
@@ -67,5 +77,6 @@
   &copy; 2026 MCPSense. Built for the future of agentic workflows.
 </footer>
 
+<script src="https://cdn.jsdelivr.net/npm/asciinema-player@3.8.0/dist/asciinema-player.min.js"></script>
 </body>
 </html>

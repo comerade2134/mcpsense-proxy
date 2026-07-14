@@ -48,4 +48,5 @@ for (const line of lines) {
 }
 const cast = [JSON.stringify(header), ...events.map((e) => JSON.stringify(e))].join("\n") + "\n";
 writeFileSync(new URL("../demo/terminal-demo.cast", import.meta.url), cast);
-console.log(`wrote demo/terminal-demo.cast (${events.length} frames)`);
+writeFileSync(new URL("../public/terminal-demo.cast", import.meta.url), cast);
+console.log(`wrote demo/terminal-demo.cast + public/terminal-demo.cast (${events.length} frames)`);
