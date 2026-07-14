@@ -24,7 +24,7 @@ beforeAll(async () => {
   rmSync(dataDir, { recursive: true, force: true });
   mkdirSync(dataDir, { recursive: true });
   remote = await startRemoteLegacyFixture();
-  srv = startCloudServer({ port: 0, registerKey: "rk" });
+  srv = startCloudServer({ port: 0, registerKey: "rk", egressAllowlist: ["127.0.0.1"] });
   await new Promise<void>((r) => srv.listen(0, r));
   base = `http://127.0.0.1:${(srv.address() as AddressInfo).port}`;
 });
@@ -99,5 +99,12 @@ describe("cloud server", () => {
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "server/discover", params: {} }),
     });
     expect(res.status).toBe(404);
+  });
+
+  it("blocks remote registration to non-allowed egress targets", async () => {
+    const blocked = await post("/register", { type: "remote", url: "http://169.254.169.254/latest/meta-data" });
+    expect(blocked.status).toBe(400);
+    const ok = await post("/register", { type: "remote", url: "https://api.example.com/mcp" });
+    expect(ok.status).toBe(200);
   });
 });

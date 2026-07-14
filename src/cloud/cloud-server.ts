@@ -5,12 +5,14 @@ import { TenantRegistry, verifyToken } from "./tenant-registry.js";
 import { createProxyHandler } from "../proxy-server.js";
 import { appendLog } from "./request-log.js";
 import { logger } from "../logger.js";
+import { isEgressAllowed } from "./egress.js";
 
 export interface CloudOptions {
   port: number;
   registerKey?: string;
   stripeSecretKey?: string;
   stripeWebhookSecret?: string;
+  egressAllowlist?: string[];
 }
 
 function json(res: ServerResponse, status: number, body: unknown, extra: Record<string, string> = {}): void {
@@ -39,10 +41,11 @@ function bearer(req: IncomingMessage): string | undefined {
   return undefined;
 }
 
-async function handleRegister(req: IncomingMessage, res: ServerResponse, reg: TenantRegistry, opts: CloudOptions): Promise<void> {
+async function handleRegister(req: IncomingMessage, res: ServerResponse, reg: TenantRegistry, opts: CloudOptions, egressAllowlist: string[]): Promise<void> {
   const body = await readJson(req);
   const key = (req.headers["x-register-key"] as string) ?? (body.registerKey as string | undefined);
   if (body.type === "remote") {
+    if (!isEgressAllowed(body.url as string, egressAllowlist)) throw new Error("EGRESS_BLOCKED");
     const { record, token } = await reg.register({ type: "remote", url: body.url as string }, key);
     return json(res, 200, { tenantId: record.id, endpoint: record.endpoint, token });
   }
@@ -117,12 +120,16 @@ async function handleStripeWebhook(req: IncomingMessage, res: ServerResponse, re
 export function startCloudServer(opts: CloudOptions): Server {
   mkdirSync(join(process.cwd(), "data", "logs"), { recursive: true });
   const reg = new TenantRegistry(opts.registerKey);
+  const egressAllowlist = opts.egressAllowlist ??
+    (process.env.REMOTE_EGRESS_ALLOWLIST
+      ? process.env.REMOTE_EGRESS_ALLOWLIST.split(",").map((s) => s.trim()).filter(Boolean)
+      : []);
   const server = createServer(async (req, res) => {
     const url = (req.url ?? "/").split("?")[0];
     const method = req.method ?? "GET";
     try {
       if (method === "GET" && url === "/health") return json(res, 200, { ok: true });
-      if (method === "POST" && url === "/register") return await handleRegister(req, res, reg, opts);
+      if (method === "POST" && url === "/register") return await handleRegister(req, res, reg, opts, egressAllowlist);
       if (method === "POST" && url === "/billing/checkout") return await handleCheckout(req, res, reg, opts);
       if (method === "POST" && url === "/stripe/webhook") return await handleStripeWebhook(req, res, reg, opts);
       const m = /^\/t\/([^/]+)\/(mcp|logs)$/.exec(url);
@@ -137,6 +144,7 @@ export function startCloudServer(opts: CloudOptions): Server {
       if (msg === "NO_STRIPE") return json(res, 503, { error: "billing not configured" });
       if (msg === "BAD_SIGNATURE") return json(res, 400, { error: "invalid signature" });
       if (msg === "BAD_JSON") return json(res, 400, { error: "invalid json" });
+  if (msg === "EGRESS_BLOCKED") return json(res, 400, { error: "egress target not allowed" });
       logger.error({ err: msg }, "unhandled cloud request error");
       return json(res, 500, { error: "internal error" });
     }

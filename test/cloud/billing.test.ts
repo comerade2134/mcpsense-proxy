@@ -26,7 +26,7 @@ async function signedPayload(event: object, secret: string): Promise<{ raw: stri
 }
 
 beforeAll(async () => {
-  srv = startCloudServer({ port: 0, stripeSecretKey: SECRET, stripeWebhookSecret: WHSEC });
+  srv = startCloudServer({ port: 0, stripeSecretKey: SECRET, stripeWebhookSecret: WHSEC, egressAllowlist: ["127.0.0.1"] });
   await new Promise<void>((r) => srv.listen(0, r));
   base = `http://127.0.0.1:${(srv.address() as AddressInfo).port}`;
 });
