@@ -120,14 +120,14 @@ export function createProxyHandler(
     let statusCode = 200;
     try {
       validateHeaders(req, body);
-      await dispatch(body, manager);
+      const result = await dispatch(body, manager); // single dispatch; result already carries resultType
       if (isNotification) {
         logger.info({ method: body.method, latencyMs: Date.now() - startTime }, "notification handled");
         statusCode = 202;
         sendJson(res, 202, traceHeaders);
       } else {
         logger.info({ method: body.method, name, latencyMs: Date.now() - startTime, status: "success" }, "request bridged");
-        sendJson(res, 200, { jsonrpc: "2.0", id: body.id ?? null, result: await dispatchResult(body, manager) }, { "Mcp-Method": body.method, ...traceHeaders });
+        sendJson(res, 200, { jsonrpc: "2.0", id: body.id ?? null, result }, { "Mcp-Method": body.method, ...traceHeaders });
       }
     } catch (err) {
       const rpcErr = err instanceof RpcError ? err : new RpcError(-32603, (err as Error).message ?? "Internal error");
@@ -145,15 +145,7 @@ export function createProxyHandler(
 }
 ```
 
-Because the success path now computes `result` separately, add this helper near `dispatch`:
-
-```ts
-async function dispatchResult(req: JsonRpcRequest, manager: LegacyClientManager) {
-  return dispatch(req, manager);
-}
-```
-
-(Kept as a thin wrapper so the existing `dispatch` is unchanged.)
+Because the success path now computes `result` once via `dispatch`, no extra wrapper is needed (the original `dispatch` already returns the fully-wrapped result including `resultType`).
 
 - [ ] **Step 4: Run test to verify it passes**
 
