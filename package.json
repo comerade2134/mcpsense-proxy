@@ -4,7 +4,8 @@
   "description": "Zero-config compatibility proxy bridging legacy stateful MCP servers to July 28, 2026 stateless clients",
   "type": "module",
   "bin": {
-    "mcpsense-proxy": "bin/mcpsense-proxy.js"
+    "mcpsense-proxy": "bin/mcpsense-proxy.js",
+    "mcpsense-cloud": "bin/cloud/mcpsense-cloud.js"
   },
   "files": [
     "bin",
