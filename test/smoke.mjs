@@ -135,8 +135,8 @@ async function run() {
   r = await post(bBase, { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }, { "mcp-method": "tools/list" });
   assert(r.json.result.tools.some((t) => t.name === "remote_greet"), "remote tools/list bridged through session");
 
-  r = await post(bBase, { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "remote_greet", arguments: { name: "LO" } } }, { "mcp-method": "tools/call", "mcp-name": "remote_greet" });
-  assert(JSON.stringify(r.json.result.content).includes("Remote hello, LO!"), "remote tools/call -> 'Remote hello, LO!'");
+  r = await post(bBase, { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "remote_greet", arguments: { name: "Light" } } }, { "mcp-method": "tools/call", "mcp-name": "remote_greet" });
+  assert(JSON.stringify(r.json.result.content).includes("Remote hello, Light!"), "remote tools/call -> 'Remote hello, Light!'");
 
   b.kill();
   remote.server.close();
