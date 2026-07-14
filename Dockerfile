@@ -13,6 +13,8 @@ ENV PORT=8080
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/bin ./bin
+RUN mkdir -p /app/data && chown -R node:node /app
+USER node
 VOLUME ["/app/data"]
 EXPOSE 8080
 CMD ["node", "bin/cloud/mcpsense-cloud.js"]
