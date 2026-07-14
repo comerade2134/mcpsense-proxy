@@ -48,6 +48,16 @@ npm test                                   # vitest integration suite
 npm run build && npm start -- -- node old-server.js
 ```
 
+## Managed Cloud (waitlist)
+
+If you need your legacy servers hosted securely in a managed, auto-scaling environment
+with centralized request logs and real-time spec-compliance alerts, join the waitlist.
+
+👉 Open an issue titled **"Cloud waitlist"** at
+`https://github.com/<your-username>/mcpsense-proxy/issues` — or star the repo and we'll reach out.
+
+> Replace `<your-username>` with your GitHub handle after creating the repository.
+
 ## License
 
 MIT
