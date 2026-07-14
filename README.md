@@ -63,6 +63,61 @@ npm test                                   # vitest integration suite
 npm run build && npm start -- -- node old-server.js
 ```
 
+## See it work
+
+`npm run demo` starts the proxy with the bundled demo legacy server and runs three
+example 2026-07-28 requests end-to-end:
+
+```text
+$ npm run demo
+
+Starting mcpsense-proxy on http://127.0.0.1:8080/mcp (bridging demo/legacy-server.mjs)...
+Proxy is up. Running example 2026-07-28 requests:
+
+$ server/discover
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "resultType": "complete",
+    "supportedVersions": ["2026-07-28"],
+    "capabilities": { "tools": {} },
+    "serverInfo": { "name": "demo-legacy", "version": "1.0.0" },
+    "instructions": "This server is bridged by MCPSense from a legacy, stateful MCP server...",
+    "ttlMs": 3600000,
+    "cacheScope": "public"
+  }
+}
+
+$ tools/list
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": { "tools": [{ "name": "echo", "description": "Echo back whatever text you send", ... }], "resultType": "complete" }
+}
+
+$ tools/call echo
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": { "content": [{ "type": "text", "text": "legacy echoed: hello from Light" }], "resultType": "complete" }
+}
+
+✅ Demo complete. Stopping proxy.
+```
+
+### Animated demo
+
+A replayable terminal cast lives at [`demo/terminal-demo.cast`](demo/terminal-demo.cast)
+(view it on [asciinema.org](https://asciinema.org) or paste it there). To render a shareable
+GIF for posts/README:
+
+```bash
+npm i -g asciinema agg
+agg demo/terminal-demo.cast demo.gif
+# then embed in README/markdown with: ![demo](demo.gif)
+```
+
 ## Managed Cloud (waitlist)
 
 If you need your legacy servers hosted securely in a managed, auto-scaling environment
