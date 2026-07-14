@@ -379,13 +379,12 @@ export class TenantRegistry {
     this.tenants.push(record);
     this.save();
 
-    const transport: Transport =
-      input.type === "remote"
-        ? new RemoteHttpClientTransport(input.url)
-        : new StdioClientTransport({ command: input.command, args: input.args ?? [] });
-    const manager = new LegacyClientManager(transport);
-    await manager.bootstrap();
-    this.managers.set(id, manager);
+    // NOTE: do NOT create/bootstrap the LegacyClientManager here. Bootstrapping
+    // performs the MCP `initialize` handshake (network for remote, spawning a
+    // child process for stdio). Doing that at registration time would (a) make
+    // registration block on backend reachability and (b) break the unit tests
+    // that register dead/throwaway backends (127.0.0.1:9, `echo`). The manager
+    // is created and bootstrapped lazily by `ensureManager` on first request.
     return { record, token };
   }
 
@@ -495,7 +494,7 @@ describe("cloud server", () => {
 
     const disc = await post(rj.endpoint, { jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28" } } }, { "mcp-protocol-version": "2026-07-28", "mcp-method": "server/discover", authorization: `Bearer ${token}` });
     expect(disc.status).toBe(200);
-    expect((await disc.json()).result.serverInfo.name).toBe("remote-legacy");
+    expect((await disc.json()).result.serverInfo.name).toBe("fixture-remote-legacy");
 
     // wrong token -> 401
     const bad = await post(rj.endpoint, { jsonrpc: "2.0", id: 1, method: "server/discover", params: {} }, { "mcp-method": "server/discover", authorization: "Bearer nope" });
@@ -514,7 +513,11 @@ describe("cloud server", () => {
     const { endpoint, token } = await reg.json();
     await post(endpoint, { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }, { "mcp-protocol-version": "2026-07-28", "mcp-method": "tools/list", authorization: `Bearer ${token}` });
     if (!existsSync(join(dataDir, "logs"))) mkdirSync(join(dataDir, "logs"), { recursive: true });
-    const logsRes = await post(endpoint.replace("/mcp", "/logs"), {}, { authorization: `Bearer ${token}` });
+    // /logs is a GET endpoint (see cloud-server route), so fetch it directly.
+    const logsRes = await fetch(base + endpoint.replace("/mcp", "/logs"), {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` },
+    });
     const lj = await logsRes.json();
     expect(lj.logs.length).toBeGreaterThan(0);
     expect(lj.logs[lj.logs.length - 1].method).toBe("tools/list");
@@ -677,7 +680,9 @@ export function startCloudServer(opts: CloudOptions): Server {
       return json(res, 500, { error: msg });
     }
   });
-  server.listen(opts.port);
+  // NOTE: do NOT call server.listen() here. The caller (the test suite or the
+  // `mcpsense-cloud` CLI) is responsible for calling `server.listen(port)`.
+  // Auto-listening here would double-bind because the tests also call listen().
   return server;
 }
 ```
@@ -772,7 +777,7 @@ In `package.json`, add to `bin`:
 ```json
 "bin": {
   "mcpsense-proxy": "bin/mcpsense-proxy.js",
-  "mcpsense-cloud": "bin/mcpsense-cloud.js"
+  "mcpsense-cloud": "bin/cloud/mcpsense-cloud.js"
 },
 ```
 and ensure `dependencies` includes `"stripe": "^17.2.0"`.
@@ -781,8 +786,8 @@ Create `src/cloud/mcpsense-cloud.ts`:
 
 ```ts
 #!/usr/bin/env node
-import { startCloudServer } from "./cloud/cloud-server.js";
-import { logger } from "./logger.js";
+import { startCloudServer } from "./cloud-server.js";
+import { logger } from "../logger.js";
 
 const port = Number.parseInt(process.env.PORT ?? "8080", 10);
 const registerKey = process.env.REGISTER_KEY;
@@ -790,6 +795,7 @@ const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 const server = startCloudServer({ port, registerKey, stripeSecretKey, stripeWebhookSecret });
+server.listen(port);
 server.on("listening", () => logger.info({ port }, "MCPSense Cloud listening"));
 ```
 
@@ -798,7 +804,7 @@ server.on("listening", () => logger.info({ port }, "MCPSense Cloud listening"));
 Run: `npm run build`
 Then in a separate PowerShell:
 ```powershell
-$env:REGISTER_KEY="rk"; $env:PORT="8099"; node bin/mcpsense-cloud.js
+$env:REGISTER_KEY="rk"; $env:PORT="8099"; node bin/cloud/mcpsense-cloud.js
 ```
 In another terminal:
 ```powershell
@@ -831,7 +837,7 @@ The same proxy, multi-tenant. Run the cloud server:
 
 \`\`\`bash
 npm run build
-REGISTER_KEY=your-dev-key PORT=8080 node bin/mcpsense-cloud.js
+REGISTER_KEY=your-dev-key PORT=8080 node bin/cloud/mcpsense-cloud.js
 \`\`\`
 
 - `POST /register` with `{ "type": "remote", "url": "..." }` is **public** and safe (only outbound HTTP).
