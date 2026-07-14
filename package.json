@@ -15,6 +15,7 @@
     "start": "node ./bin/mcpsense-proxy.js",
     "dev": "tsx src/mcpsense-proxy.ts",
     "test": "vitest run",
+    "smoke": "npm run build && node test/smoke.mjs",
     "prepublishOnly": "npm run build"
   },
   "engines": {
