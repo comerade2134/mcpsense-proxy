@@ -25,7 +25,8 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "commander": "^11.1.0",
-    "pino": "^9.1.0"
+    "pino": "^9.1.0",
+    "stripe": "^17.7.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
