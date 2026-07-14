@@ -15,11 +15,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: "https://registry.npmjs.org"
       - run: npm ci
       - run: npm run build
       - run: npm test
-      - run: npm publish --access public
+      - name: Check if version already published
+        id: check
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "mcpsense-proxy@$VERSION" version >/dev/null 2>&1; then
+            echo "already-published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already-published=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish
+        if: steps.check.outputs.already-published != 'true'
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
