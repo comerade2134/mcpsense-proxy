@@ -4,6 +4,11 @@ import { TenantRegistry } from "../../src/cloud/tenant-registry.js";
 import { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { Stripe } from "stripe";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+
+process.env.DATA_DIR = mkdtempSync(join(tmpdir(), "mcpsense-bill-"));
 
 let srv: Server;
 let base: string;
@@ -30,7 +35,10 @@ beforeAll(async () => {
   await new Promise<void>((r) => srv.listen(0, r));
   base = `http://127.0.0.1:${(srv.address() as AddressInfo).port}`;
 });
-afterAll(() => srv?.close());
+afterAll(() => {
+  srv?.close();
+  rmSync(process.env.DATA_DIR as string, { recursive: true, force: true });
+});
 
 describe("billing", () => {
   it("webhook with valid signature flips tenant to paid", async () => {

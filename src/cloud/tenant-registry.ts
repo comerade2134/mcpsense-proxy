@@ -6,8 +6,9 @@ import { RemoteHttpClientTransport } from "../remote-http-transport.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
-const DATA_DIR = join(process.cwd(), "data");
-const TENANTS_FILE = join(DATA_DIR, "tenants.json");
+function resolveDataDir(dataDir?: string): string {
+  return dataDir ?? process.env.DATA_DIR ?? join(process.cwd(), "data");
+}
 
 export interface TenantRecord {
   id: string;
@@ -43,18 +44,25 @@ function randomToken(): string {
 }
 
 export class TenantRegistry {
+  private dataDir: string;
   private tenants: TenantRecord[] = [];
   private managers = new Map<string, LegacyClientManager>();
   private inflight = new Map<string, Promise<LegacyClientManager | undefined>>();
 
-  constructor(private readonly registerKey?: string) {
+  constructor(private readonly registerKey?: string, dataDir?: string) {
+    this.dataDir = resolveDataDir(dataDir);
     this.load();
   }
 
+  private tenantsFile(): string {
+    return join(this.dataDir, "tenants.json");
+  }
+
   private load(): void {
-    if (existsSync(TENANTS_FILE)) {
+    const file = this.tenantsFile();
+    if (existsSync(file)) {
       try {
-        this.tenants = JSON.parse(readFileSync(TENANTS_FILE, "utf8")).tenants ?? [];
+        this.tenants = JSON.parse(readFileSync(file, "utf8")).tenants ?? [];
       } catch {
         this.tenants = [];
       }
@@ -62,8 +70,8 @@ export class TenantRegistry {
   }
 
   private save(): void {
-    mkdirSync(DATA_DIR, { recursive: true });
-    writeFileSync(TENANTS_FILE, JSON.stringify({ tenants: this.tenants }, null, 2));
+    mkdirSync(this.dataDir, { recursive: true });
+    writeFileSync(this.tenantsFile(), JSON.stringify({ tenants: this.tenants }, null, 2));
   }
 
   async register(
@@ -152,6 +160,6 @@ export class TenantRegistry {
   }
 
   logPath(id: string): string {
-    return join(DATA_DIR, "logs", `${id}.jsonl`);
+    return join(this.dataDir, "logs", `${id}.jsonl`);
   }
 }

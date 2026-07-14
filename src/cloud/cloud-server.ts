@@ -15,6 +15,7 @@ export interface CloudOptions {
   egressAllowlist?: string[];
   publicBaseUrl?: string;
   registry?: TenantRegistry;
+  dataDir?: string;
 }
 
 function json(res: ServerResponse, status: number, body: unknown, extra: Record<string, string> = {}): void {
@@ -163,8 +164,9 @@ async function handleStripeWebhook(req: IncomingMessage, res: ServerResponse, re
 }
 
 export function startCloudServer(opts: CloudOptions): Server {
-  mkdirSync(join(process.cwd(), "data", "logs"), { recursive: true });
-  const reg = opts.registry ?? new TenantRegistry(opts.registerKey);
+  const dataDir = opts.dataDir ?? process.env.DATA_DIR ?? join(process.cwd(), "data");
+  mkdirSync(join(dataDir, "logs"), { recursive: true });
+  const reg = opts.registry ?? new TenantRegistry(opts.registerKey, dataDir);
   const publicBaseUrl = opts.publicBaseUrl ?? process.env.PUBLIC_BASE_URL ?? "https://comerade2134.github.io/mcpsense-proxy";
   if (!opts.publicBaseUrl) opts.publicBaseUrl = publicBaseUrl;
   const egressAllowlist = opts.egressAllowlist ??

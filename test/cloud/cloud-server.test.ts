@@ -4,8 +4,11 @@ import { startRemoteLegacyFixture } from "../fixture-remote-legacy-server.js";
 import { TenantRegistry } from "../../src/cloud/tenant-registry.js";
 import { AddressInfo } from "node:net";
 import type { Server } from "node:http";
-import { existsSync, readFileSync, rmSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, mkdirSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
+
+process.env.DATA_DIR = mkdtempSync(join(tmpdir(), "mcpsense-cs-"));
 
 let srv: Server;
 let base: string;
@@ -21,7 +24,7 @@ function post(path: string, body: unknown, headers: Record<string, string> = {})
 }
 
 beforeAll(async () => {
-  dataDir = join(process.cwd(), "data");
+  dataDir = process.env.DATA_DIR as string;
   rmSync(dataDir, { recursive: true, force: true });
   mkdirSync(dataDir, { recursive: true });
   remote = await startRemoteLegacyFixture();
