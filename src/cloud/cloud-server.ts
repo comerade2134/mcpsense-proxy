@@ -71,6 +71,7 @@ async function handleTenantMcp(req: IncomingMessage, res: ServerResponse, reg: T
   if (!rec) throw new Error("NOT_FOUND");
   const token = bearer(req);
   if (!token || !verifyToken(rec.tokenHash, token)) throw new Error("UNAUTHORIZED");
+  if (rec.disabled) return json(res, 403, { error: "tenant disabled" });
   const gate = paymentGate(rec, opts, id);
   if (gate) return json(res, gate.status, gate.body);
   const manager = await reg.ensureManager(id);
@@ -81,11 +82,22 @@ async function handleTenantMcp(req: IncomingMessage, res: ServerResponse, reg: T
   await handler(req, res);
 }
 
+async function handleRotate(req: IncomingMessage, res: ServerResponse, reg: TenantRegistry, id: string): Promise<void> {
+  const rec = reg.findById(id);
+  if (!rec) throw new Error("NOT_FOUND");
+  const token = bearer(req);
+  if (!token || !verifyToken(rec.tokenHash, token)) throw new Error("UNAUTHORIZED");
+  const newToken = reg.rotateToken(id);
+  if (!newToken) throw new Error("NOT_FOUND");
+  return json(res, 200, { token: newToken });
+}
+
 async function handleTenantLogs(req: IncomingMessage, res: ServerResponse, reg: TenantRegistry, id: string, opts: CloudOptions): Promise<void> {
   const rec = reg.findById(id);
   if (!rec) throw new Error("NOT_FOUND");
   const token = bearer(req);
   if (!token || !verifyToken(rec.tokenHash, token)) throw new Error("UNAUTHORIZED");
+  if (rec.disabled) return json(res, 403, { error: "tenant disabled" });
   const gate = paymentGate(rec, opts, id);
   if (gate) return json(res, gate.status, gate.body);
   const p = reg.logPath(id);
@@ -148,6 +160,8 @@ export function startCloudServer(opts: CloudOptions): Server {
       if (method === "POST" && url === "/register") return await handleRegister(req, res, reg, opts, egressAllowlist);
       if (method === "POST" && url === "/billing/checkout") return await handleCheckout(req, res, reg, opts);
       if (method === "POST" && url === "/stripe/webhook") return await handleStripeWebhook(req, res, reg, opts);
+      const r = /^\/t\/([^/]+)\/rotate$/.exec(url);
+      if (r && method === "POST") return await handleRotate(req, res, reg, r[1]);
       const m = /^\/t\/([^/]+)\/(mcp|logs)$/.exec(url);
       if (m && m[2] === "mcp" && method === "POST") return await handleTenantMcp(req, res, reg, m[1], opts);
       if (m && m[2] === "logs" && method === "GET") return await handleTenantLogs(req, res, reg, m[1], opts);

@@ -18,6 +18,7 @@ export interface TenantRecord {
   args?: string[];
   endpoint: string;
   paid: boolean;
+  disabled: boolean;
   createdAt: number;
 }
 
@@ -80,6 +81,7 @@ export class TenantRegistry {
       kind: input.type,
       endpoint: `/t/${id}/mcp`,
       paid: false,
+      disabled: false,
       createdAt: Math.floor(Date.now() / 1000),
       ...(input.type === "remote"
         ? { remoteUrl: input.url }
@@ -130,6 +132,22 @@ export class TenantRegistry {
     const rec = this.findById(id);
     if (!rec) return;
     rec.paid = paid;
+    this.save();
+  }
+
+  rotateToken(id: string): string | undefined {
+    const rec = this.findById(id);
+    if (!rec) return undefined;
+    const token = randomToken();
+    rec.tokenHash = hashToken(token);
+    this.save();
+    return token;
+  }
+
+  setDisabled(id: string, disabled: boolean): void {
+    const rec = this.findById(id);
+    if (!rec) return;
+    rec.disabled = disabled;
     this.save();
   }
 

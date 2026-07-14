@@ -150,3 +150,52 @@ describe("cloud server (paid mode)", () => {
     expect(res.status).toBe(402);
   });
 });
+
+describe("cloud server (token rotation + disable)", () => {
+  let rotSrv: Server;
+  let rotBase: string;
+  let reg: TenantRegistry;
+
+  beforeAll(async () => {
+    reg = new TenantRegistry("rk");
+    rotSrv = startCloudServer({ port: 0, registerKey: "rk", registry: reg, egressAllowlist: ["127.0.0.1"] });
+    await new Promise<void>((r) => rotSrv.listen(0, r));
+    rotBase = `http://127.0.0.1:${(rotSrv.address() as AddressInfo).port}`;
+  });
+  afterAll(() => rotSrv?.close());
+
+  function rotPost(path: string, body: unknown, headers: Record<string, string> = {}) {
+    return fetch(rotBase + path, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
+  }
+
+  it("rotates a tenant token and invalidates the old one", async () => {
+    const regRes = await rotPost("/register", { type: "remote", url: remote.url });
+    const { endpoint, token } = await regRes.json();
+    const rot = await rotPost(endpoint.replace("/mcp", "/rotate"), {}, { authorization: `Bearer ${token}` });
+    expect(rot.status).toBe(200);
+    const newToken = (await rot.json()).token as string;
+    expect(newToken).not.toBe(token);
+    const oldUse = await rotPost(endpoint, { jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28" } } }, { "mcp-protocol-version": "2026-07-28", "mcp-method": "server/discover", authorization: `Bearer ${token}` });
+    expect(oldUse.status).toBe(401);
+    const newUse = await rotPost(endpoint, { jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28" } } }, { "mcp-protocol-version": "2026-07-28", "mcp-method": "server/discover", authorization: `Bearer ${newToken}` });
+    expect(newUse.status).toBe(200);
+  });
+
+  it("rejects rotation with a bad token (401)", async () => {
+    const regRes = await rotPost("/register", { type: "remote", url: remote.url });
+    const { endpoint } = await regRes.json();
+    const bad = await rotPost(endpoint.replace("/mcp", "/rotate"), {}, { authorization: "Bearer nope" });
+    expect(bad.status).toBe(401);
+  });
+
+  it("blocks a disabled tenant on the bridge (403) and re-enables", async () => {
+    const { record, token } = await reg.register({ type: "remote", url: remote.url }, "rk");
+    const disc = (headers: Record<string, string>) =>
+      rotPost(record.endpoint, { jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28" } } }, { "mcp-protocol-version": "2026-07-28", "mcp-method": "server/discover", ...headers });
+    expect((await disc({ authorization: `Bearer ${token}` })).status).toBe(200);
+    reg.setDisabled(record.id, true);
+    expect((await disc({ authorization: `Bearer ${token}` })).status).toBe(403);
+    reg.setDisabled(record.id, false);
+    expect((await disc({ authorization: `Bearer ${token}` })).status).toBe(200);
+  });
+});
