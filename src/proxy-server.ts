@@ -174,10 +174,16 @@ function validateHeaders(req: IncomingMessage, body: JsonRpcRequest): void {
   }
 }
 
-export function createProxyHandler(manager: LegacyClientManager) {
+export interface ProxyOptions {
+  onRequest?: (e: { method: string; status: number; latencyMs: number; name?: string }) => void;
+}
+
+export function createProxyHandler(manager: LegacyClientManager, options?: ProxyOptions) {
+  const onRequest = options?.onRequest;
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const traceparent = req.headers["traceparent"];
     const traceHeaders: Record<string, string> = traceparent ? { traceparent: String(traceparent) } : {};
+    const startTime = Date.now();
 
     if (req.method === "GET") {
       // Server→client notification stream. MVP keeps it open but pushes nothing.
@@ -219,24 +225,26 @@ export function createProxyHandler(manager: LegacyClientManager) {
       return;
     }
 
-    const startTime = Date.now();
     const isNotification = NOTIFICATION_METHODS.has(body.method) || body.id === undefined;
 
     try {
       validateHeaders(req, body);
+      const name = (body.params?.name ?? body.params?.uri) as string | undefined;
       const result = await dispatch(body, manager);
 
       if (isNotification) {
         logger.info({ method: body.method, latencyMs: Date.now() - startTime }, "notification handled");
+        onRequest?.({ method: body.method, status: 202, latencyMs: Date.now() - startTime, name });
         res.writeHead(202, traceHeaders);
         res.end();
         return;
       }
 
       logger.info(
-        { method: body.method, name: body.params?.name ?? body.params?.uri, latencyMs: Date.now() - startTime, status: "success" },
+        { method: body.method, name, latencyMs: Date.now() - startTime, status: "success" },
         "request bridged",
       );
+      onRequest?.({ method: body.method, status: 200, latencyMs: Date.now() - startTime, name });
       sendJson(
         res,
         200,
@@ -245,11 +253,17 @@ export function createProxyHandler(manager: LegacyClientManager) {
       );
     } catch (err) {
       const rpcErr = err instanceof RpcError ? err : new RpcError(-32603, (err as Error).message ?? "Internal error");
-      const status = rpcErr.code === -32601 ? 404 : rpcErr.code === -32001 ? 400 : 500;
+      const status = rpcErr.code === -32601 ? 400 : rpcErr.code === -32001 ? 400 : 500;
       logger.error(
         { method: body.method, latencyMs: Date.now() - startTime, code: rpcErr.code, message: rpcErr.message },
         "request failed",
       );
+      onRequest?.({
+        method: body?.method ?? "unknown",
+        status,
+        latencyMs: Date.now() - startTime,
+        name: (body?.params?.name ?? body?.params?.uri) as string | undefined,
+      });
       if (isNotification) {
         res.writeHead(202, traceHeaders);
         res.end();
