@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startCloudServer } from "../../src/cloud/cloud-server.js";
 import { startRemoteLegacyFixture } from "../fixture-remote-legacy-server.js";
+import { TenantRegistry } from "../../src/cloud/tenant-registry.js";
 import { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { existsSync, readFileSync, rmSync, mkdirSync } from "node:fs";
@@ -106,5 +107,46 @@ describe("cloud server", () => {
     expect(blocked.status).toBe(400);
     const ok = await post("/register", { type: "remote", url: "https://api.example.com/mcp" });
     expect(ok.status).toBe(200);
+  });
+});
+
+describe("cloud server (paid mode)", () => {
+  let paidSrv: Server;
+  let paidBase: string;
+  let reg: TenantRegistry;
+
+  beforeAll(async () => {
+    reg = new TenantRegistry("rk");
+    paidSrv = startCloudServer({ port: 0, registerKey: "rk", stripeSecretKey: "sk_test_x", registry: reg });
+    await new Promise<void>((r) => paidSrv.listen(0, r));
+    paidBase = `http://127.0.0.1:${(paidSrv.address() as AddressInfo).port}`;
+  });
+  afterAll(() => paidSrv?.close());
+
+  function paidPost(path: string, body: unknown, headers: Record<string, string> = {}) {
+    return fetch(paidBase + path, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
+  }
+
+  it("blocks bridging for an unpaid tenant with a checkout link (402)", async () => {
+    const { record, token } = await reg.register({ type: "remote", url: remote.url }, "rk");
+    const res = await paidPost(record.endpoint, { jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28" } } }, { "mcp-protocol-version": "2026-07-28", "mcp-method": "server/discover", authorization: `Bearer ${token}` });
+    expect(res.status).toBe(402);
+    const j = await res.json();
+    expect(j.error).toBe("payment required");
+    expect(j.checkout).toContain(`tenantId=${record.id}`);
+  });
+
+  it("allows bridging once the tenant is marked paid (200)", async () => {
+    const { record, token } = await reg.register({ type: "remote", url: remote.url }, "rk");
+    reg.setPaid(record.id, true);
+    const res = await paidPost(record.endpoint, { jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28" } } }, { "mcp-protocol-version": "2026-07-28", "mcp-method": "server/discover", authorization: `Bearer ${token}` });
+    expect(res.status).toBe(200);
+    expect((await res.json()).result.serverInfo.name).toBe("fixture-remote-legacy");
+  });
+
+  it("blocks /logs for an unpaid tenant (402)", async () => {
+    const { record, token } = await reg.register({ type: "remote", url: remote.url }, "rk");
+    const res = await fetch(paidBase + record.endpoint.replace("/mcp", "/logs"), { method: "GET", headers: { authorization: `Bearer ${token}` } });
+    expect(res.status).toBe(402);
   });
 });

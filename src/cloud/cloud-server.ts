@@ -1,7 +1,7 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { TenantRegistry, verifyToken } from "./tenant-registry.js";
+import { TenantRegistry, verifyToken, type TenantRecord } from "./tenant-registry.js";
 import { createProxyHandler } from "../proxy-server.js";
 import { appendLog } from "./request-log.js";
 import { logger } from "../logger.js";
@@ -13,6 +13,8 @@ export interface CloudOptions {
   stripeSecretKey?: string;
   stripeWebhookSecret?: string;
   egressAllowlist?: string[];
+  publicBaseUrl?: string;
+  registry?: TenantRegistry;
 }
 
 function json(res: ServerResponse, status: number, body: unknown, extra: Record<string, string> = {}): void {
@@ -56,11 +58,21 @@ async function handleRegister(req: IncomingMessage, res: ServerResponse, reg: Te
   return json(res, 400, { error: "invalid type" });
 }
 
-async function handleTenantMcp(req: IncomingMessage, res: ServerResponse, reg: TenantRegistry, id: string): Promise<void> {
+function paymentGate(rec: TenantRecord, opts: CloudOptions, id: string): { status: number; body: unknown } | null {
+  if (opts.stripeSecretKey && rec.paid !== true) {
+    const base = opts.publicBaseUrl ?? process.env.PUBLIC_BASE_URL ?? "https://comerade2134.github.io/mcpsense-proxy";
+    return { status: 402, body: { error: "payment required", checkout: `${base}/#/billing?tenantId=${id}` } };
+  }
+  return null;
+}
+
+async function handleTenantMcp(req: IncomingMessage, res: ServerResponse, reg: TenantRegistry, id: string, opts: CloudOptions): Promise<void> {
   const rec = reg.findById(id);
   if (!rec) throw new Error("NOT_FOUND");
   const token = bearer(req);
   if (!token || !verifyToken(rec.tokenHash, token)) throw new Error("UNAUTHORIZED");
+  const gate = paymentGate(rec, opts, id);
+  if (gate) return json(res, gate.status, gate.body);
   const manager = await reg.ensureManager(id);
   if (!manager) throw new Error("NOT_FOUND");
   const handler = createProxyHandler(manager, {
@@ -69,11 +81,13 @@ async function handleTenantMcp(req: IncomingMessage, res: ServerResponse, reg: T
   await handler(req, res);
 }
 
-async function handleTenantLogs(req: IncomingMessage, res: ServerResponse, reg: TenantRegistry, id: string): Promise<void> {
+async function handleTenantLogs(req: IncomingMessage, res: ServerResponse, reg: TenantRegistry, id: string, opts: CloudOptions): Promise<void> {
   const rec = reg.findById(id);
   if (!rec) throw new Error("NOT_FOUND");
   const token = bearer(req);
   if (!token || !verifyToken(rec.tokenHash, token)) throw new Error("UNAUTHORIZED");
+  const gate = paymentGate(rec, opts, id);
+  if (gate) return json(res, gate.status, gate.body);
   const p = reg.logPath(id);
   const lines = existsSync(p) ? readFileSync(p, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : [];
   return json(res, 200, { logs: lines.slice(-100) });
@@ -119,7 +133,9 @@ async function handleStripeWebhook(req: IncomingMessage, res: ServerResponse, re
 
 export function startCloudServer(opts: CloudOptions): Server {
   mkdirSync(join(process.cwd(), "data", "logs"), { recursive: true });
-  const reg = new TenantRegistry(opts.registerKey);
+  const reg = opts.registry ?? new TenantRegistry(opts.registerKey);
+  const publicBaseUrl = opts.publicBaseUrl ?? process.env.PUBLIC_BASE_URL ?? "https://comerade2134.github.io/mcpsense-proxy";
+  if (!opts.publicBaseUrl) opts.publicBaseUrl = publicBaseUrl;
   const egressAllowlist = opts.egressAllowlist ??
     (process.env.REMOTE_EGRESS_ALLOWLIST
       ? process.env.REMOTE_EGRESS_ALLOWLIST.split(",").map((s) => s.trim()).filter(Boolean)
@@ -133,8 +149,8 @@ export function startCloudServer(opts: CloudOptions): Server {
       if (method === "POST" && url === "/billing/checkout") return await handleCheckout(req, res, reg, opts);
       if (method === "POST" && url === "/stripe/webhook") return await handleStripeWebhook(req, res, reg, opts);
       const m = /^\/t\/([^/]+)\/(mcp|logs)$/.exec(url);
-      if (m && m[2] === "mcp" && method === "POST") return await handleTenantMcp(req, res, reg, m[1]);
-      if (m && m[2] === "logs" && method === "GET") return await handleTenantLogs(req, res, reg, m[1]);
+      if (m && m[2] === "mcp" && method === "POST") return await handleTenantMcp(req, res, reg, m[1], opts);
+      if (m && m[2] === "logs" && method === "GET") return await handleTenantLogs(req, res, reg, m[1], opts);
       return json(res, 404, { error: "not found" });
     } catch (e) {
       const msg = (e as Error).message;
