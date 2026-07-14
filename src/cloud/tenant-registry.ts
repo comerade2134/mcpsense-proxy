@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { LegacyClientManager } from "../legacy-client.js";
@@ -34,16 +34,17 @@ export function verifyToken(storedHash: string, token: string): boolean {
 }
 
 function genId(): string {
-  return "t_" + createHash("sha256").update(Math.random().toString() + Date.now()).digest("hex").slice(0, 12);
+  return "t_" + randomBytes(6).toString("hex");
 }
 
 function randomToken(): string {
-  return createHash("sha256").update(Math.random().toString() + Date.now()).digest("hex").slice(0, 32);
+  return randomBytes(32).toString("hex");
 }
 
 export class TenantRegistry {
   private tenants: TenantRecord[] = [];
   private managers = new Map<string, LegacyClientManager>();
+  private inflight = new Map<string, Promise<LegacyClientManager | undefined>>();
 
   constructor(private readonly registerKey?: string) {
     this.load();
@@ -106,16 +107,23 @@ export class TenantRegistry {
   async ensureManager(id: string): Promise<LegacyClientManager | undefined> {
     const existing = this.managers.get(id);
     if (existing) return existing;
-    const rec = this.findById(id);
-    if (!rec) return undefined;
-    const transport: Transport =
-      rec.kind === "remote"
-        ? new RemoteHttpClientTransport(rec.remoteUrl!)
-        : new StdioClientTransport({ command: rec.command!, args: rec.args ?? [] });
-    const manager = new LegacyClientManager(transport);
-    await manager.bootstrap();
-    this.managers.set(id, manager);
-    return manager;
+    const inFlight = this.inflight.get(id);
+    if (inFlight) return inFlight;
+    const p = (async () => {
+      const rec = this.findById(id);
+      if (!rec) return undefined;
+      const transport: Transport =
+        rec.kind === "remote"
+          ? new RemoteHttpClientTransport(rec.remoteUrl!)
+          : new StdioClientTransport({ command: rec.command!, args: rec.args ?? [] });
+      const manager = new LegacyClientManager(transport);
+      await manager.bootstrap();
+      this.managers.set(id, manager);
+      return manager;
+    })();
+    this.inflight.set(id, p);
+    p.finally(() => this.inflight.delete(id));
+    return p;
   }
 
   setPaid(id: string, paid: boolean): void {

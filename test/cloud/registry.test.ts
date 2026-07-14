@@ -1,9 +1,13 @@
 import { TenantRegistry, verifyToken, hashToken } from "../../src/cloud/tenant-registry.js";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
 
+const DATA_DIR = join(process.cwd(), "data");
+
 describe("TenantRegistry", () => {
+  afterAll(() => rmSync(DATA_DIR, { recursive: true, force: true }));
+
   it("registers a remote tenant publicly and returns a plaintext token", async () => {
     const reg = new TenantRegistry();
     const { record, token } = await reg.register({ type: "remote", url: "http://127.0.0.1:9/mcp" });
@@ -28,6 +32,20 @@ describe("TenantRegistry", () => {
   it("sets paid flag and hashToken is stable length", () => {
     expect(hashToken("abc").length).toBe(64);
     const reg = new TenantRegistry();
-    reg.setPaid("t_doesnotexist", true); // no-op, must not throw
+    reg.setPaid("t_doesnotexist", true);
+  });
+
+  it("does not bootstrap a manager at registration (lazy via ensureManager)", async () => {
+    const reg = new TenantRegistry();
+    const { record } = await reg.register({ type: "remote", url: "http://127.0.0.1:9/mcp" });
+    expect(reg.getManager(record.id)).toBeUndefined();
+    const mgr = await reg.ensureManager(record.id);
+    expect(mgr).toBeDefined();
+    expect(reg.getManager(record.id)).toBe(mgr);
+  });
+
+  it("ensureManager returns undefined for unknown tenant", async () => {
+    const reg = new TenantRegistry();
+    expect(await reg.ensureManager("t_unknown")).toBeUndefined();
   });
 });
