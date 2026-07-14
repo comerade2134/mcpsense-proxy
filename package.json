@@ -1,0 +1,34 @@
+{
+  "name": "mcpsense-proxy",
+  "version": "0.1.0",
+  "description": "Zero-config compatibility proxy bridging legacy stateful MCP servers to July 28, 2026 stateless clients",
+  "type": "module",
+  "bin": {
+    "mcpsense-proxy": "./bin/mcpsense-proxy.js"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node ./bin/mcpsense-proxy.js",
+    "dev": "tsx src/mcpsense-proxy.ts",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "commander": "^11.1.0",
+    "pino": "^9.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.1",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}
