@@ -39,7 +39,7 @@ export class RemoteHttpClientTransport implements Transport {
     const headers: Record<string, string> = { Accept: "text/event-stream" };
     if (this.sessionIdValue) headers["Mcp-Session-Id"] = this.sessionIdValue;
     try {
-      const res = await fetch(this.remoteUrl, { method: "GET", headers, signal: this.abort.signal });
+      const res = await fetch(this.remoteUrl, { method: "GET", headers, signal: this.abort.signal, redirect: "manual" });
       if (!res.ok || !res.body) return;
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -72,7 +72,12 @@ export class RemoteHttpClientTransport implements Transport {
       headers,
       body: JSON.stringify(message),
       signal: this.abort.signal,
+      redirect: "manual",
     });
+
+    if ((res as { type?: string }).type === "opaqueredirect" || res.status === 0) {
+      throw new Error("redirects are not followed (SSRF guard)");
+    }
 
     // Capture the session id from the initialize response headers.
     const sid = res.headers.get("mcp-session-id") ?? res.headers.get("X-Mcp-Session-Id");

@@ -216,3 +216,74 @@ describe("cloud server (token rotation + disable)", () => {
     expect((await disc({ authorization: `Bearer ${token}` })).status).toBe(200);
   });
 });
+
+describe("cloud server (admin tenant disable endpoint)", () => {
+  let adminSrv: Server;
+  let adminBase: string;
+  let reg: TenantRegistry;
+
+  beforeAll(async () => {
+    reg = new TenantRegistry("rk");
+    adminSrv = startCloudServer({ port: 0, registerKey: "rk", adminKey: "adminsecret", registry: reg, egressAllowlist: ["127.0.0.1"] });
+    await new Promise<void>((r) => adminSrv.listen(0, r));
+    adminBase = `http://127.0.0.1:${(adminSrv.address() as AddressInfo).port}`;
+  });
+  afterAll(() => adminSrv?.close());
+
+  function adminPost(path: string, headers: Record<string, string> = {}) {
+    return fetch(adminBase + path, { method: "POST", headers });
+  }
+  function bridge(endpoint: string, token: string) {
+    return fetch(adminBase + endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "mcp-protocol-version": "2026-07-28",
+        "mcp-method": "server/discover",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28" } } }),
+    });
+  }
+
+  it("disables and re-enables a tenant at runtime with the admin key", async () => {
+    const { record, token } = await reg.register({ type: "remote", url: remote.url }, "rk");
+    expect((await bridge(record.endpoint, token)).status).toBe(200);
+
+    const disable = await adminPost(`/admin/tenant/${record.id}/disable`, { "x-admin-key": "adminsecret" });
+    expect(disable.status).toBe(200);
+    const dj = await disable.json();
+    expect(dj).toEqual({ id: record.id, disabled: true });
+    expect((await bridge(record.endpoint, token)).status).toBe(403);
+
+    const enable = await adminPost(`/admin/tenant/${record.id}/enable`, { "x-admin-key": "adminsecret" });
+    expect(enable.status).toBe(200);
+    const ej = await enable.json();
+    expect(ej).toEqual({ id: record.id, disabled: false });
+    expect((await bridge(record.endpoint, token)).status).toBe(200);
+  });
+
+  it("rejects admin disable with a wrong key (401)", async () => {
+    const { record } = await reg.register({ type: "remote", url: remote.url }, "rk");
+    const bad = await adminPost(`/admin/tenant/${record.id}/disable`, { "x-admin-key": "wrong" });
+    expect(bad.status).toBe(401);
+  });
+
+  it("returns 503 when admin is not configured", async () => {
+    let noAdminSrv: Server;
+    let noAdminBase: string;
+    try {
+      noAdminSrv = startCloudServer({ port: 0, registerKey: "rk", registry: reg, egressAllowlist: ["127.0.0.1"] });
+      await new Promise<void>((r) => noAdminSrv.listen(0, r));
+      noAdminBase = `http://127.0.0.1:${(noAdminSrv.address() as AddressInfo).port}`;
+      const { record } = await reg.register({ type: "remote", url: remote.url }, "rk");
+      const res = await fetch(noAdminBase + `/admin/tenant/${record.id}/disable`, {
+        method: "POST",
+        headers: { "x-admin-key": "adminsecret" },
+      });
+      expect(res.status).toBe(503);
+    } finally {
+      noAdminSrv?.close();
+    }
+  });
+});

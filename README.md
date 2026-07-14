@@ -203,6 +203,14 @@ by that UID (e.g. `chown -R 1000:1000 ./data` before first run).
   by design — set the allowlist to pin exactly the hosts your tenants may reach.
 - The `checkout` `success_url` is restricted to the origin of `PUBLIC_BASE_URL`, so a
   caller cannot redirect a post-payment browser to an arbitrary external origin.
+- **Backend redirects are NOT followed.** The remote egress transport uses
+  `redirect: "manual"` as an SSRF guard, so an allowlisted backend cannot `302` to a
+  private/metadata endpoint (e.g. `http://169.254.169.254/`). Redirect responses are
+  rejected rather than followed.
+- **`ADMIN_KEY` (or the `adminKey` option) enables an operator endpoint**
+  `POST /admin/tenant/<id>/disable|enable` (header `x-admin-key`) to disable abusive
+  tenants at runtime without hand-editing `data/tenants.json`. Without `ADMIN_KEY` the
+  endpoint returns `503`.
 
 #### Known limitations (be explicit)
 

@@ -16,6 +16,7 @@ export interface CloudOptions {
   publicBaseUrl?: string;
   registry?: TenantRegistry;
   dataDir?: string;
+  adminKey?: string;
 }
 
 function json(res: ServerResponse, status: number, body: unknown, extra: Record<string, string> = {}): void {
@@ -169,6 +170,16 @@ export function startCloudServer(opts: CloudOptions): Server {
   const reg = opts.registry ?? new TenantRegistry(opts.registerKey, dataDir);
   const publicBaseUrl = opts.publicBaseUrl ?? process.env.PUBLIC_BASE_URL ?? "https://comerade2134.github.io/mcpsense-proxy";
   if (!opts.publicBaseUrl) opts.publicBaseUrl = publicBaseUrl;
+  const adminKey = opts.adminKey ?? process.env.ADMIN_KEY;
+  async function handleAdminTenant(req: IncomingMessage, res: ServerResponse, reg: TenantRegistry, id: string, disabled: boolean): Promise<void> {
+    const rec = reg.findById(id);
+    if (!rec) throw new Error("NOT_FOUND");
+    const key = req.headers["x-admin-key"];
+    if (!adminKey) throw new Error("NO_ADMIN");
+    if (typeof key !== "string" || key !== adminKey) throw new Error("UNAUTHORIZED");
+    reg.setDisabled(id, disabled);
+    return json(res, 200, { id, disabled });
+  }
   const egressAllowlist = opts.egressAllowlist ??
     (process.env.REMOTE_EGRESS_ALLOWLIST
       ? process.env.REMOTE_EGRESS_ALLOWLIST.split(",").map((s) => s.trim()).filter(Boolean)
@@ -181,8 +192,10 @@ export function startCloudServer(opts: CloudOptions): Server {
       if (method === "POST" && url === "/register") return await handleRegister(req, res, reg, opts, egressAllowlist);
       if (method === "POST" && url === "/billing/checkout") return await handleCheckout(req, res, reg, opts);
       if (method === "POST" && url === "/stripe/webhook") return await handleStripeWebhook(req, res, reg, opts);
-      const r = /^\/t\/([^/]+)\/rotate$/.exec(url);
-      if (r && method === "POST") return await handleRotate(req, res, reg, r[1]);
+       const r = /^\/t\/([^/]+)\/rotate$/.exec(url);
+       if (r && method === "POST") return await handleRotate(req, res, reg, r[1]);
+       const a = /^\/admin\/tenant\/([^/]+)\/(disable|enable)$/.exec(url);
+       if (a && method === "POST") return await handleAdminTenant(req, res, reg, a[1], a[2] === "disable");
       const m = /^\/t\/([^/]+)\/(mcp|logs)$/.exec(url);
       if (m && m[2] === "mcp" && method === "POST") return await handleTenantMcp(req, res, reg, m[1], opts);
       if (m && m[2] === "logs" && method === "GET") return await handleTenantLogs(req, res, reg, m[1], opts);
@@ -192,7 +205,8 @@ export function startCloudServer(opts: CloudOptions): Server {
       if (msg === "FORBIDDEN_STDIO") return json(res, 403, { error: "stdio registration requires REGISTER_KEY" });
       if (msg === "UNAUTHORIZED") return json(res, 401, { error: "unauthorized" });
       if (msg === "NOT_FOUND") return json(res, 404, { error: "tenant not found" });
-      if (msg === "NO_STRIPE") return json(res, 503, { error: "billing not configured" });
+       if (msg === "NO_STRIPE") return json(res, 503, { error: "billing not configured" });
+       if (msg === "NO_ADMIN") return json(res, 503, { error: "admin not configured" });
       if (msg === "BAD_SIGNATURE") return json(res, 400, { error: "invalid signature" });
       if (msg === "BAD_JSON") return json(res, 400, { error: "invalid json" });
       if (msg === "EGRESS_BLOCKED") return json(res, 400, { error: "egress target not allowed" });
