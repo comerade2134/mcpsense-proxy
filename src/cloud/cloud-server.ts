@@ -144,7 +144,7 @@ export function startCloudServer(opts: CloudOptions): Server {
       if (msg === "NO_STRIPE") return json(res, 503, { error: "billing not configured" });
       if (msg === "BAD_SIGNATURE") return json(res, 400, { error: "invalid signature" });
       if (msg === "BAD_JSON") return json(res, 400, { error: "invalid json" });
-  if (msg === "EGRESS_BLOCKED") return json(res, 400, { error: "egress target not allowed" });
+      if (msg === "EGRESS_BLOCKED") return json(res, 400, { error: "egress target not allowed" });
       logger.error({ err: msg }, "unhandled cloud request error");
       return json(res, 500, { error: "internal error" });
     }

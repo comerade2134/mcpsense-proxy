@@ -21,4 +21,16 @@ describe("isEgressAllowed", () => {
     expect(isEgressAllowed("file:///etc/passwd")).toBe(false);
     expect(isEgressAllowed("not-a-url")).toBe(false);
   });
+  it("blocks embedded IPv4-in-IPv6 transitional addresses", () => {
+    expect(isEgressAllowed("http://[::ffff:7f00:1]/mcp")).toBe(false); // 127.0.0.1
+    expect(isEgressAllowed("http://[::ffff:a9fe:a9fe]/mcp")).toBe(false); // 169.254.169.254
+    expect(isEgressAllowed("http://[2002:0a00:1::]/mcp")).toBe(false); // 10.0.0.1 (6to4)
+    expect(isEgressAllowed("http://[2001:0:0:0:0:0:f5ff:fffe]/")).toBe(false); // Teredo -> 10.0.0.1
+  });
+  it("treats literal-IP allowlist entries as exact-match only (no range suffix)", () => {
+    expect(isEgressAllowed("http://127.0.0.1:9/mcp", ["10.0.0.5"])).toBe(false);
+    expect(isEgressAllowed("http://10.0.0.6/mcp", ["10.0.0.5"])).toBe(false);
+    expect(isEgressAllowed("http://10.0.0.5/mcp", ["10.0.0.5"])).toBe(true);
+    expect(isEgressAllowed("http://sub.example.com/mcp", ["example.com"])).toBe(true); // hostname suffix still works
+  });
 });
