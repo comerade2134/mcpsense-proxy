@@ -140,6 +140,23 @@ enterprise AI pipelines on a developer's laptop is a recipe for downtime.
 
 👉 **[Join the MCPSense Cloud Beta Waitlist](https://comerade2134.github.io/mcpsense-proxy/)** to secure early access and lock in beta pricing.
 
+## MCPSense Cloud (local dev)
+
+The same proxy, multi-tenant. Run the cloud server:
+
+```bash
+npm run build
+REGISTER_KEY=your-dev-key PORT=8080 node bin/cloud/mcpsense-cloud.js
+```
+
+- `POST /register` with `{ "type": "remote", "url": "..." }` is **public** and safe (only outbound HTTP).
+- `POST /register` with `{ "type": "stdio", "command": "...", "args": [...] }` requires the `REGISTER_KEY` header/field (prevents RCE).
+- Bridge a tenant: `POST /t/<tenantId>/mcp` with `Authorization: Bearer <token>`.
+- View logs: `GET /t/<tenantId>/logs` (token required).
+- Billing (test mode): `POST /billing/checkout`, `POST /stripe/webhook` (needs `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`).
+
+State lives in `data/tenants.json` + `data/logs/<tenantId>.jsonl`.
+
 ## License
 
 MIT
