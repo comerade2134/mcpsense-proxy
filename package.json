@@ -1,6 +1,6 @@
 {
   "name": "mcpsense-proxy",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Zero-config compatibility proxy bridging legacy stateful MCP servers to July 28, 2026 stateless clients",
   "type": "module",
   "bin": {
