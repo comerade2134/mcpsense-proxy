@@ -1,5 +1,5 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
-import { createReadStream, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { TenantRegistry, verifyToken, type TenantRecord } from "./tenant-registry.js";
 import { createProxyHandler } from "../proxy-server.js";
@@ -103,7 +103,13 @@ async function handleTenantLogs(req: IncomingMessage, res: ServerResponse, reg: 
   const p = reg.logPath(id);
   res.writeHead(200, { "Content-Type": "application/jsonl" });
   if (!existsSync(p)) { res.end(); return; }
-  createReadStream(p).pipe(res);
+  createReadStream(p)
+    .on("error", (err) => {
+      logger.error({ err }, "log stream error");
+      if (!res.headersSent) res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "log read failed" }));
+    })
+    .pipe(res);
 }
 
 async function handleCheckout(req: IncomingMessage, res: ServerResponse, reg: TenantRegistry, opts: CloudOptions): Promise<void> {
