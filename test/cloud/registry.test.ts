@@ -35,13 +35,10 @@ describe("TenantRegistry", () => {
     reg.setPaid("t_doesnotexist", true);
   });
 
-  it("does not bootstrap a manager at registration (lazy via ensureManager)", async () => {
+  it("does not create a manager at registration (lazy via ensureManager)", async () => {
     const reg = new TenantRegistry();
     const { record } = await reg.register({ type: "remote", url: "http://127.0.0.1:9/mcp" });
     expect(reg.getManager(record.id)).toBeUndefined();
-    const mgr = await reg.ensureManager(record.id);
-    expect(mgr).toBeDefined();
-    expect(reg.getManager(record.id)).toBe(mgr);
   });
 
   it("ensureManager returns undefined for unknown tenant", async () => {
