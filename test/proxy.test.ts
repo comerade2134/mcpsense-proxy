@@ -124,11 +124,12 @@ describe("mcpsense-proxy", () => {
     await new Promise<void>((resolve) => server.listen(0, resolve));
     const addr = server.address() as AddressInfo;
     const base = `http://127.0.0.1:${addr.port}/mcp`;
-    await fetch(`${base}`, {
+    const r1 = await fetch(`${base}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Mcp-Method": "tools/list", "Accept": "application/json, text/event-stream" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
     });
+    expect(r1.status).toBe(200);
     await fetch(`${base}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Mcp-Method": "bogus/method", "Accept": "application/json, text/event-stream" },
@@ -137,6 +138,7 @@ describe("mcpsense-proxy", () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     expect(events.length).toBe(2);
     expect(events[0].status).toBe(200);
+    expect(events[0].latencyMs).toBeGreaterThanOrEqual(0);
     expect(events[0].method).toBe("tools/list");
     expect(events[1].status).toBe(404);
   });

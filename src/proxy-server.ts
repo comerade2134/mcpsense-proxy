@@ -180,6 +180,13 @@ export interface ProxyOptions {
 
 export function createProxyHandler(manager: LegacyClientManager, options?: ProxyOptions) {
   const onRequest = options?.onRequest;
+  const safeOnRequest = (e: { method: string; status: number; latencyMs: number; name?: string }) => {
+    try {
+      onRequest?.(e);
+    } catch {
+      // a logging/telemetry hook must never break the actual response
+    }
+  };
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const traceparent = req.headers["traceparent"];
     const traceHeaders: Record<string, string> = traceparent ? { traceparent: String(traceparent) } : {};
@@ -234,7 +241,7 @@ export function createProxyHandler(manager: LegacyClientManager, options?: Proxy
 
       if (isNotification) {
         logger.info({ method: body.method, latencyMs: Date.now() - startTime }, "notification handled");
-        onRequest?.({ method: body.method, status: 202, latencyMs: Date.now() - startTime, name });
+        safeOnRequest({ method: body.method, status: 202, latencyMs: Date.now() - startTime, name });
         res.writeHead(202, traceHeaders);
         res.end();
         return;
@@ -244,7 +251,7 @@ export function createProxyHandler(manager: LegacyClientManager, options?: Proxy
         { method: body.method, name, latencyMs: Date.now() - startTime, status: "success" },
         "request bridged",
       );
-      onRequest?.({ method: body.method, status: 200, latencyMs: Date.now() - startTime, name });
+      safeOnRequest({ method: body.method, status: 200, latencyMs: Date.now() - startTime, name });
       sendJson(
         res,
         200,
@@ -258,11 +265,11 @@ export function createProxyHandler(manager: LegacyClientManager, options?: Proxy
         { method: body.method, latencyMs: Date.now() - startTime, code: rpcErr.code, message: rpcErr.message },
         "request failed",
       );
-      onRequest?.({
-        method: body?.method ?? "unknown",
+      safeOnRequest({
+        method: body.method,
         status,
         latencyMs: Date.now() - startTime,
-        name: (body?.params?.name ?? body?.params?.uri) as string | undefined,
+        name: (body.params?.name ?? body.params?.uri) as string | undefined,
       });
       if (isNotification) {
         res.writeHead(202, traceHeaders);
