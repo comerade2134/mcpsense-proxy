@@ -54,9 +54,7 @@ If you need your legacy servers hosted securely in a managed, auto-scaling envir
 with centralized request logs and real-time spec-compliance alerts, join the waitlist.
 
 👉 Open an issue titled **"Cloud waitlist"** at
-`https://github.com/<your-username>/mcpsense-proxy/issues` — or star the repo and we'll reach out.
-
-> Replace `<your-username>` with your GitHub handle after creating the repository.
+`https://github.com/comerade2134/mcpsense-proxy/issues` — or star the repo and we'll reach out.
 
 ## License
 
