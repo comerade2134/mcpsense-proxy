@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { Implementation, ServerCapabilities } from "@modelcontextprotocol/sdk/types.js";
 import { logger } from "./logger.js";
 
@@ -26,22 +27,23 @@ export class LegacyClientManager {
   private resourceTemplates: unknown[] = [];
   private prompts: unknown[] = [];
 
-  constructor(
-    private readonly command: string,
-    private readonly args: string[] = [],
-  ) {}
+  /**
+   * @param transport A connected-or-connectable transport to the legacy backend.
+   *                  Use `StdioClientTransport` for a local child process or
+   *                  `RemoteHttpClientTransport` for a remote stateful HTTP server.
+   */
+  constructor(private readonly transport: Transport) {}
 
   async bootstrap(): Promise<void> {
-    logger.info({ command: this.command, args: this.args }, "spawning legacy MCP server");
+    logger.info("warming up legacy MCP backend session");
 
-    const transport = new StdioClientTransport({ command: this.command, args: this.args });
     this.client = new Client(
       { name: "mcpsense-bridge", version: "0.1.0" },
       { capabilities: {} },
     );
 
     // SDK 1.29.0 performs the legacy `initialize` handshake here automatically.
-    await this.client.connect(transport);
+    await this.client.connect(this.transport);
 
     this.serverInfo = this.client.getServerVersion();
     this.capabilities = this.client.getServerCapabilities();

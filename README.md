@@ -21,21 +21,36 @@ Then point any 2026-07-28 client at `http://localhost:8080/mcp`.
 - One legacy server process is spawned and warmed up (the `initialize` handshake runs
   at startup, so the first request has no handshake latency).
 
+### Remote backend (Phase 4)
+
+Instead of spawning a local command, you can bridge a **remote, stateful legacy server**
+that already speaks Streamable HTTP and expects the `Mcp-Session-Id` header:
+
+```bash
+npx mcpsense-proxy --port 8080 --remote https://legacy.example.com/mcp
+```
+
+MCPSense owns the remote session — it performs `initialize` against the remote server,
+captures the returned `Mcp-Session-Id`, and injects it on every forwarded request. The
+2026-07-28 stateless front end is identical; only the back end differs.
+
 ## How it works
 
 ```
 2026 client ──HTTP/Streamable (stateless, Mcp-Method/Mcp-Name)──▶ mcpsense-proxy
-                                                                        │
-                                              forwards by real tool/resource/prompt name
-                                                                        ▼
-                                              legacy MCP server (stdio, stateful session)
+                                                                         │
+                                               forwards by real tool/resource/prompt name
+                                                                         ▼
+                        legacy MCP server ── stdio ── OR ── remote Streamable HTTP (session)
 ```
 
 - **Front end**: a hand-rolled stateless Streamable HTTP server implementing the
   2026-07-28 wire format — required `Mcp-Method` / `Mcp-Name` headers, `server/discover`,
   `_meta` protocol-version matching, and `400 / -32001` header/body validation.
-- **Back end**: the official `@modelcontextprotocol/sdk` `Client` + `StdioClientTransport`,
-  which performs the legacy `initialize` handshake automatically and keeps the session warm.
+- **Back end**: the official `@modelcontextprotocol/sdk` `Client` driving either a
+  `StdioClientTransport` (local child process) or a `RemoteHttpClientTransport`
+  (remote Streamable HTTP server expecting `Mcp-Session-Id`). Both perform the legacy
+  `initialize` handshake automatically and keep the session warm.
 - **Model**: one upstream session per proxy instance (single-user local use). Multi-tenant
   session isolation is intentionally deferred to the managed cloud tier.
 
