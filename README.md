@@ -68,8 +68,22 @@ npm run build && npm start -- -- node old-server.js
 If you need your legacy servers hosted securely in a managed, auto-scaling environment
 with centralized request logs and real-time spec-compliance alerts, join the waitlist.
 
-👉 Open an issue titled **"Cloud waitlist"** at
-`https://github.com/comerade2134/mcpsense-proxy/issues` — or star the repo and we'll reach out.
+👉 **[Join the MCPSense Cloud Beta waitlist](https://mcpsense.example.com)** — or open an issue
+titled **"Cloud waitlist"** at `https://github.com/comerade2134/mcpsense-proxy/issues`.
+
+## ☁️ Going to Production? Meet MCPSense Cloud ($19/seat)
+
+While the local CLI is great for testing and local development, running mission-critical
+enterprise AI pipelines on a developer's laptop is a recipe for downtime.
+
+**MCPSense Cloud** is our upcoming managed hosting platform built for high-velocity teams:
+
+- **Zero-Downtime Hosting:** Deploy your legacy MCP servers on serverless, auto-scaling infrastructure.
+- **Multi-Tenant Session Isolation:** Safely multiplex developer requests with enterprise-grade session routing.
+- **Compliance & Audit Logs:** Real-time logging of tool latency, status, and payload signatures (essential for security audits).
+- **Alerting:** Get notified before things break when clients roll out runtime updates.
+
+👉 **[Join the MCPSense Cloud Beta Waitlist](https://mcpsense.example.com)** to secure early access and lock in beta pricing.
 
 ## License
 

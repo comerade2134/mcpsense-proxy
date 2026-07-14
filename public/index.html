@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-slate-950 text-slate-100">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCPSense — Prevent the July 28 MCP Stateless Breakage</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen flex flex-col justify-between font-sans selection:bg-indigo-500 selection:text-white">
+
+<!-- Hero Section -->
+<header class="max-w-4xl mx-auto px-6 pt-20 pb-16 text-center">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-red-500/30 bg-red-500/10 text-red-400 text-xs font-medium mb-6 animate-pulse">
+  ⚠️ July 28, 2026: MCP Goes Stateless
+</div>
+<h1 class="text-4xl md:text-6xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+  Your MCP Servers Will Break on July 28.
+</h1>
+<p class="mt-6 text-lg md:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
+  Anthropic is removing the stateful handshake. Most existing MCP servers aren't ready for the 2026-07-28 spec yet. Fix yours instantly with a zero-config proxy.
+</p>
+
+<!-- The CLI Hook -->
+<div class="mt-10 max-w-xl mx-auto">
+  <div class="bg-slate-900 border border-slate-800 rounded-lg p-4 text-left font-mono text-sm relative group overflow-hidden">
+    <span class="text-indigo-400">npx</span> mcpsense-proxy --port <span class="text-emerald-400">8080</span> -- <span class="text-slate-400">node old-server.js</span>
+  </div>
+  <p class="text-xs text-slate-500 mt-2">Free &amp; Open Source forever. Works for stdio and remote-HTTP.</p>
+</div>
+</header>
+
+<!-- Value Prop / Cloud Transition -->
+<main class="max-w-4xl mx-auto px-6 py-12 border-t border-slate-900">
+<h2 class="text-2xl font-bold text-center mb-12">Move from Local Terminal to Managed Infrastructure</h2>
+
+<div class="grid md:grid-cols-3 gap-8">
+  <div class="bg-slate-900/50 border border-slate-900 p-6 rounded-xl">
+    <div class="text-indigo-400 text-lg mb-3 font-semibold">☁️ Managed Cloud</div>
+    <p class="text-sm text-slate-400 leading-relaxed">Don't run background processes on developer laptops. Host, deploy, and scale your legacy MCP servers globally with 1-click.</p>
+  </div>
+  <div class="bg-slate-900/50 border border-slate-900 p-6 rounded-xl">
+    <div class="text-indigo-400 text-lg mb-3 font-semibold">📊 Compliance Audit</div>
+    <p class="text-sm text-slate-400 leading-relaxed">Monitor every prompt, tool call, and response. Real-time compliance logging keeps your enterprise pipelines safe.</p>
+  </div>
+  <div class="bg-slate-900/50 border border-slate-900 p-6 rounded-xl">
+    <div class="text-indigo-400 text-lg mb-3 font-semibold">🛡️ Session Isolation</div>
+    <p class="text-sm text-slate-400 leading-relaxed">Enterprise-grade multi-tenant security. Ensure only developers access the sessions and tools they are authorized to use.</p>
+  </div>
+</div>
+
+<!-- Waitlist Form (Connects to Formspree, Getform, or Tally) -->
+<section class="mt-20 max-w-md mx-auto text-center bg-gradient-to-b from-indigo-950/20 to-transparent border border-indigo-500/20 rounded-2xl p-8">
+  <h3 class="text-xl font-bold mb-2">Join the MCPSense Cloud Beta</h3>
+  <p class="text-sm text-slate-400 mb-6">Securing enterprise AI pipelines before the July 28 deadline. Seats are limited.</p>
+
+  <!-- TODO: replace the action URL with your Formspree / Tally / Getform endpoint -->
+  <form action="https://formspree.io/f/YOUR_ENDPOINT" method="POST" class="flex flex-col gap-3">
+    <input type="email" name="email" required placeholder="Enter your work email" class="bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-600" />
+    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-6 rounded-lg text-sm transition-all shadow-lg shadow-indigo-600/20">
+      Get Early Access ($19/seat)
+    </button>
+  </form>
+</section>
+</main>
+
+<!-- Footer -->
+<footer class="max-w-4xl mx-auto px-6 py-12 text-center text-xs text-slate-600 border-t border-slate-900 w-full">
+  &copy; 2026 MCPSense. Built for the future of agentic workflows.
+</footer>
+
+</body>
+</html>
