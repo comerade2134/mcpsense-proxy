@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { TenantRegistry, verifyToken } from "./tenant-registry.js";
 import { createProxyHandler } from "../proxy-server.js";
 import { appendLog } from "./request-log.js";
+import { logger } from "../logger.js";
 
 export interface CloudOptions {
   port: number;
@@ -135,7 +136,9 @@ export function startCloudServer(opts: CloudOptions): Server {
       if (msg === "NOT_FOUND") return json(res, 404, { error: "tenant not found" });
       if (msg === "NO_STRIPE") return json(res, 503, { error: "billing not configured" });
       if (msg === "BAD_SIGNATURE") return json(res, 400, { error: "invalid signature" });
-      return json(res, 500, { error: msg });
+      if (msg === "BAD_JSON") return json(res, 400, { error: "invalid json" });
+      logger.error({ err: msg }, "unhandled cloud request error");
+      return json(res, 500, { error: "internal error" });
     }
   });
   // NOTE: do NOT call server.listen() here. The caller (the test or the

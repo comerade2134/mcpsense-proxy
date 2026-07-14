@@ -75,4 +75,29 @@ describe("cloud server", () => {
     const h = await fetch(base + "/health");
     expect(h.status).toBe(200);
   });
+
+  it("rejects malformed JSON with 400", async () => {
+    const res = await fetch(base + "/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{not json",
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects /logs without a valid token (401)", async () => {
+    const reg = await post("/register", { type: "remote", url: remote.url });
+    const { endpoint } = await reg.json();
+    const res = await fetch(base + endpoint.replace("/mcp", "/logs"), { method: "GET" });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 for unknown tenant", async () => {
+    const res = await fetch(base + "/t/t_unknown/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer x" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "server/discover", params: {} }),
+    });
+    expect(res.status).toBe(404);
+  });
 });
