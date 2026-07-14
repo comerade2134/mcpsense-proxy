@@ -172,3 +172,49 @@ lines but wasteful. Replace with a per-path in-memory ring.
 - Persistence remains JSON-file (single instance) — documented as v2 work.
 - Out of scope kept out: full user-account dashboard, horizontal scaling,
   enterprise SLA, DNS-rebinding protection (noted in egress docs).
+
+---
+
+## Status: DONE ✅
+
+All 6 tasks implemented, each two-stage reviewed (spec + code quality), plus a
+final holistic review. Two must-fix gaps found in the holistic review were fixed.
+Final VERDICT: **READY** for public deployment.
+
+- Tests: **42 passing** (was 25 at slice start). `npm run build` clean.
+- Holistic review verdict: **READY** (no remaining must-fix).
+
+### Commits (in order)
+- `7c7629e` feat(cloud): add SSRF egress allowlist for remote register
+- `6aa93d8` fix(cloud): block embedded IPv4-in-IPv6 SSRF + exact-match IP allowlist
+- `de6bbac` feat(cloud): enforce paid gating on bridge when Stripe configured
+- `edc68dc` feat(cloud): token rotation + tenant disable
+- `a6b96c5` perf(cloud): stream per-tenant logs (O(1) memory, application/jsonl)
+- `92bc7ac` fix(cloud): add stream error handler + drop dead fs import (logs)
+- `5d0891a` build: add Dockerfile (multi-stage) + CI workflow
+- `bbf522c` build: run container as non-root + ignore bin in build context
+- `bc50442` docs(cloud): production deploy guide, landing mention, same-origin checkout
+- `cac3e38` test(cloud): isolate tenant data per test file (fixes cross-file flake)
+- `9fc9824` security(cloud): block redirect SSRF + add operable tenant-disable admin endpoint
+
+### Must-fix gaps closed (post-holistic)
+1. **Redirect SSRF** — `RemoteHttpClientTransport` now uses `redirect: "manual"`
+   and throws on an opaque-redirect response, so an allowlisted backend can no
+   longer `302` to a private/metadata IP and bypass the egress allowlist.
+2. **Tenant disable operable** — added `POST /admin/tenant/:id/disable|enable`
+   gated by `ADMIN_KEY` (`x-admin-key`); abusive tenants can now be killed at
+   runtime instead of by hand-editing `data/tenants.json`.
+
+### Known limitations (documented; acceptable for v1 → v2)
+- Single-instance only (JSON-file store; no multi-replica).
+- DNS-rebinding on `remote` hostnames not mitigated (register only trusted hostnames).
+- `/billing/checkout` has no auth (anyone can start a session) — acceptable for slice.
+- No multi-user dashboard (token rotation + disable = "basic auth" only).
+- `/register` is unauthenticated for `remote` (by design); protected by SSRF guard
+  + optional `REGISTER_KEY` for `stdio`.
+- `/register` has no rate limit (v2 hardening).
+- Log `cap()` re-reads the file per append (bounded by `CAP=1000`; read path is O(1)).
+
+### Next step (handled by LO, NOT by the assistant)
+`npm publish` (version bump) + announce on HN Show HN / r/ClaudeMCP / r/MCP.
+The cloud slice + hardening gate are complete and merged on `main`.
