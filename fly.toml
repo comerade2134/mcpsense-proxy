@@ -1,0 +1,26 @@
+app = "mcpsense-cloud"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  # PUBLIC_BASE_URL, STRIPE_*, REGISTER_KEY, REMOTE_EGRESS_ALLOWLIST are set via `fly secrets set`
+
+[mounts]
+  source = "mcpsense_data"
+  destination = "/app/data"
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+  [[services.ports]]
+    port = 443
+    tls_options = { alpn = ["h2"] }
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true

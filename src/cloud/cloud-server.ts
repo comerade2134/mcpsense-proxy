@@ -1,6 +1,6 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
-import { createReadStream, existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { createReadStream, existsSync, mkdirSync, statSync } from "node:fs";
+import { join, extname, resolve } from "node:path";
 import { TenantRegistry, verifyToken, type TenantRecord } from "./tenant-registry.js";
 import { createProxyHandler } from "../proxy-server.js";
 import { appendLog } from "./request-log.js";
@@ -22,6 +22,31 @@ export interface CloudOptions {
 function json(res: ServerResponse, status: number, body: unknown, extra: Record<string, string> = {}): void {
   res.writeHead(status, { "Content-Type": "application/json", ...extra });
   res.end(JSON.stringify(body));
+}
+
+const PUBLIC_DIR = join(process.cwd(), "public");
+const CONTENT_TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".json": "application/json",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".cast": "application/octet-stream",
+};
+
+async function serveStatic(res: ServerResponse, urlPath: string): Promise<boolean> {
+  if (!existsSync(PUBLIC_DIR)) return false;
+  const rel = urlPath === "/" ? "/index.html" : urlPath;
+  const pubDir = resolve(PUBLIC_DIR);
+  const filePath = resolve(PUBLIC_DIR, rel);
+  if (filePath !== pubDir && !filePath.startsWith(pubDir + "/")) return false;
+  if (!existsSync(filePath) || !statSync(filePath).isFile()) return false;
+  const ext = extname(filePath).toLowerCase();
+  res.writeHead(200, { "Content-Type": CONTENT_TYPES[ext] ?? "application/octet-stream" });
+  createReadStream(filePath).pipe(res);
+  return true;
 }
 
 function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -131,12 +156,22 @@ async function handleCheckout(req: IncomingMessage, res: ServerResponse, reg: Te
       /* keep default */
     }
   }
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    client_reference_id: body.tenantId as string,
-    line_items: [{ price: (body.priceId as string) ?? process.env.STRIPE_PRICE_ID, quantity: 1 }],
+  const tenantId = body.tenantId as string | undefined;
+  if (!tenantId) throw new Error("NO_TENANT");
+  const priceId = (body.priceId as string) ?? process.env.STRIPE_PRICE_ID;
+  if (!priceId) throw new Error("NO_PRICE");
+  const price = await stripe.prices.retrieve(priceId);
+  const mode = price.recurring ? "subscription" : "payment";
+  const sessionParams: import("stripe").Stripe.Checkout.SessionCreateParams = {
+    mode,
+    client_reference_id: tenantId,
+    line_items: [{ price: priceId, quantity: 1 }],
     success_url: successUrl,
-  });
+  };
+  if (mode === "subscription") {
+    sessionParams.subscription_data = { metadata: { tenant_id: tenantId } };
+  }
+  const session = await stripe.checkout.sessions.create(sessionParams);
   return json(res, 200, { url: session.url });
 }
 
@@ -160,6 +195,14 @@ async function handleStripeWebhook(req: IncomingMessage, res: ServerResponse, re
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as { client_reference_id?: string | null };
     if (session.client_reference_id) reg.setPaid(session.client_reference_id, true);
+  }
+  if (event.type === "customer.subscription.deleted" || event.type === "customer.subscription.updated") {
+    const sub = event.data.object as { metadata?: { tenant_id?: string | null }; status?: string };
+    const tid = sub.metadata?.tenant_id;
+    if (tid) {
+      const paid = event.type === "customer.subscription.updated" && sub.status === "active";
+      reg.setPaid(tid, paid);
+    }
   }
   return json(res, 200, { received: true });
 }
@@ -198,8 +241,9 @@ export function startCloudServer(opts: CloudOptions): Server {
        if (a && method === "POST") return await handleAdminTenant(req, res, reg, a[1], a[2] === "disable");
       const m = /^\/t\/([^/]+)\/(mcp|logs)$/.exec(url);
       if (m && m[2] === "mcp" && method === "POST") return await handleTenantMcp(req, res, reg, m[1], opts);
-      if (m && m[2] === "logs" && method === "GET") return await handleTenantLogs(req, res, reg, m[1], opts);
-      return json(res, 404, { error: "not found" });
+       if (m && m[2] === "logs" && method === "GET") return await handleTenantLogs(req, res, reg, m[1], opts);
+       if (method === "GET" && (await serveStatic(res, url))) return;
+       return json(res, 404, { error: "not found" });
     } catch (e) {
       const msg = (e as Error).message;
       if (msg === "FORBIDDEN_STDIO") return json(res, 403, { error: "stdio registration requires REGISTER_KEY" });
@@ -207,7 +251,9 @@ export function startCloudServer(opts: CloudOptions): Server {
       if (msg === "NOT_FOUND") return json(res, 404, { error: "tenant not found" });
        if (msg === "NO_STRIPE") return json(res, 503, { error: "billing not configured" });
        if (msg === "NO_ADMIN") return json(res, 503, { error: "admin not configured" });
-      if (msg === "BAD_SIGNATURE") return json(res, 400, { error: "invalid signature" });
+       if (msg === "BAD_SIGNATURE") return json(res, 400, { error: "invalid signature" });
+       if (msg === "NO_PRICE") return json(res, 400, { error: "no price configured: set STRIPE_PRICE_ID or pass priceId" });
+       if (msg === "NO_TENANT") return json(res, 400, { error: "tenantId is required" });
       if (msg === "BAD_JSON") return json(res, 400, { error: "invalid json" });
       if (msg === "EGRESS_BLOCKED") return json(res, 400, { error: "egress target not allowed" });
       logger.error({ err: msg }, "unhandled cloud request error");

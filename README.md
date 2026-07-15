@@ -153,7 +153,7 @@ REGISTER_KEY=your-dev-key PORT=8080 node bin/cloud/mcpsense-cloud.js
 - `POST /register` with `{ "type": "stdio", "command": "...", "args": [...] }` requires the `REGISTER_KEY` header/field (prevents RCE).
 - Bridge a tenant: `POST /t/<tenantId>/mcp` with `Authorization: Bearer <token>`.
 - View logs: `GET /t/<tenantId>/logs` (token required).
-- Billing (test mode): `POST /billing/checkout`, `POST /stripe/webhook` (needs `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`).
+- Billing: `POST /billing/checkout`, `POST /stripe/webhook` (needs `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` to enable paid mode).
 
 State lives in `data/tenants.json` + `data/logs/<tenantId>.jsonl`.
 
@@ -193,6 +193,31 @@ by that UID (e.g. `chown -R 1000:1000 ./data` before first run).
 | `STRIPE_PRICE_ID` | with Stripe | — | Default price for checkout |
 | `PUBLIC_BASE_URL` | with Stripe | `https://comerade2134.github.io/mcpsense-proxy` | Base for the `checkout` link + same-origin `success_url` restriction |
 | `DATA_DIR` | no | `./data` | Tenant DB + logs (mount a volume) |
+
+### Billing (Stripe)
+
+Paid gating is opt-in. With `STRIPE_SECRET_KEY` (and a price) set, every newly
+registered tenant starts `paid: false` and receives a `402` on `/t/<id>/mcp` and
+`/t/<id>/logs` until a successful checkout flips it.
+
+1. In the Stripe Dashboard create a **Product** + **Price** (one-time or
+   subscription) and copy the Price ID into `STRIPE_PRICE_ID`.
+2. Register a **webhook endpoint** at `<PUBLIC_BASE_URL>/stripe/webhook` for the
+   `checkout.session.completed` event; copy its signing secret into
+   `STRIPE_WEBHOOK_SECRET`.
+3. (Optional) set `PUBLIC_BASE_URL` to your cloud's public origin so the `402`
+   checkout link and the same-origin `success_url` restriction resolve correctly.
+
+At runtime a gated tenant gets a `402` with a `checkout` URL
+(`#/billing?tenantId=<id>`). Completing checkout via `POST /billing/checkout`
+redirects to Stripe Hosted Checkout; the webhook then sets the tenant `paid` and
+the endpoints unlock. A recurring (subscription) price is detected automatically
+(`mode: "subscription"`) and the tenant's `paid` flag follows the subscription
+lifecycle — cancelled or non-active subscriptions re-lock the endpoints. The
+landing page ships a `#/billing` form (with an editable API-endpoint field) that
+drives this. `POST /billing/checkout` requires a `tenantId` and a configured
+price (env `STRIPE_PRICE_ID` or a `priceId` in the body) and returns a clear
+`400` otherwise.
 
 #### Security notes
 

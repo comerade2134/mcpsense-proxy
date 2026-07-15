@@ -83,6 +83,27 @@
   </div>
   <p class="text-xs text-slate-500 mt-4">Full deploy guide, env vars, and security notes in the <a href="#mcpsense-cloud-local-dev" class="text-indigo-400 hover:text-indigo-300 underline underline-offset-2">README Cloud section</a>.</p>
 </section>
+
+<!-- Billing (Stripe Checkout) -->
+<section id="billing" class="mt-20 max-w-md mx-auto text-center bg-slate-900/50 border border-indigo-500/20 rounded-2xl p-8" hidden>
+  <h3 class="text-xl font-bold mb-2">☁️ MCPSense Cloud — Complete your payment</h3>
+  <p class="text-sm text-slate-400 mb-6 leading-relaxed">Your tenant is created but gated. Complete checkout to activate the <code class="font-mono text-slate-300">/mcp</code> and <code class="font-mono text-slate-300">/logs</code> endpoints.</p>
+  <form id="billing-form" class="flex flex-col gap-3 text-left">
+    <label class="text-xs text-slate-400">Tenant ID
+      <input id="billing-tenant" name="tenantId" readonly class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono text-slate-300" />
+    </label>
+    <label class="text-xs text-slate-400">Cloud API endpoint
+      <input id="billing-api" name="api" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono text-slate-300" placeholder="https://your-cloud.example.com" />
+    </label>
+    <label class="text-xs text-slate-400">Price ID <span class="text-slate-600">(optional)</span>
+      <input id="billing-price" name="priceId" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono text-slate-300" placeholder="price_… (defaults to server STRIPE_PRICE_ID)" />
+    </label>
+    <button type="submit" class="mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-6 rounded-lg text-sm transition-all shadow-lg shadow-indigo-600/20">
+      Continue to payment
+    </button>
+    <p id="billing-status" class="text-xs text-center min-h-[1rem]"></p>
+  </form>
+</section>
 </main>
 
 <!-- Footer -->
@@ -91,5 +112,65 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/asciinema-player@3.8.0/dist/asciinema-player.min.js"></script>
+<script>
+  (function () {
+    function parseHash() {
+      var h = (location.hash || "").replace(/^#\/?/, "");
+      var qi = h.indexOf("?");
+      var route = qi === -1 ? h : h.slice(0, qi);
+      var params = new URLSearchParams(qi === -1 ? "" : h.slice(qi + 1));
+      return { route: route, params: params };
+    }
+    function syncBilling() {
+      var section = document.getElementById("billing");
+      if (!section) return;
+      var parsed = parseHash();
+      if (parsed.route === "billing") {
+        section.hidden = false;
+        section.scrollIntoView({ behavior: "smooth", block: "start" });
+        document.getElementById("billing-tenant").value = parsed.params.get("tenantId") || "";
+        document.getElementById("billing-api").value =
+          parsed.params.get("api") || location.origin;
+      } else {
+        section.hidden = true;
+      }
+    }
+    window.addEventListener("hashchange", syncBilling);
+    window.addEventListener("DOMContentLoaded", syncBilling);
+
+    var form = document.getElementById("billing-form");
+    if (form) {
+      form.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        var status = document.getElementById("billing-status");
+        var tenantId = document.getElementById("billing-tenant").value.trim();
+        var api = document.getElementById("billing-api").value.trim().replace(/\/+$/, "");
+        var priceId = document.getElementById("billing-price").value.trim();
+        if (!tenantId) { status.textContent = "Missing tenantId in URL."; status.className = "text-xs text-center text-red-400"; return; }
+        if (!api) { status.textContent = "Enter your Cloud API endpoint."; status.className = "text-xs text-center text-red-400"; return; }
+        status.textContent = "Contacting cloud…"; status.className = "text-xs text-center text-slate-400";
+        try {
+          var body = { tenantId: tenantId };
+          if (priceId) body.priceId = priceId;
+          var resp = await fetch(api + "/billing/checkout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          var data = await resp.json().catch(function () { return {}; });
+          if (!resp.ok || !data.url) {
+            status.textContent = data.error ? "Error: " + data.error : "Checkout failed (" + resp.status + ").";
+            status.className = "text-xs text-center text-red-400";
+            return;
+          }
+          window.location.href = data.url;
+        } catch (err) {
+          status.textContent = "Network error: " + err.message;
+          status.className = "text-xs text-center text-red-400";
+        }
+      });
+    }
+  })();
+</script>
 </body>
 </html>

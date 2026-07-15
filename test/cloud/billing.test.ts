@@ -65,4 +65,28 @@ describe("billing", () => {
     });
     expect(res.status).toBe(400);
   });
+
+  it("subscription deleted event un-pays the tenant", async () => {
+    const reg = await post("/register", { type: "remote", url: "http://127.0.0.1:9/mcp" });
+    const tenantId = (await reg.json()).tenantId;
+    const paid = await signedPayload({ id: "evt_a", type: "checkout.session.completed", data: { object: { client_reference_id: tenantId } } }, WHSEC);
+    await fetch(base + "/stripe/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": paid.sig }, body: paid.raw });
+    expect(new TenantRegistry().findById(tenantId)?.paid).toBe(true);
+    const del = await signedPayload({ id: "evt_b", type: "customer.subscription.deleted", data: { object: { metadata: { tenant_id: tenantId }, status: "canceled" } } }, WHSEC);
+    const res = await fetch(base + "/stripe/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": del.sig }, body: del.raw });
+    expect(res.status).toBe(200);
+    expect(new TenantRegistry().findById(tenantId)?.paid).toBe(false);
+  });
+
+  it("checkout without tenantId returns 400", async () => {
+    const res = await post("/billing/checkout", { priceId: "price_abc" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/tenantId is required/);
+  });
+
+  it("checkout without a price returns 400", async () => {
+    const res = await post("/billing/checkout", { tenantId: "tenant_abc" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/no price configured/);
+  });
 });
