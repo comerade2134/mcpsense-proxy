@@ -3,3 +3,6 @@ bin/
 *.log
 .DS_Store
 data/
+.env
+.env.*
+.npmrc
