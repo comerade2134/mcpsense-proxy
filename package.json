@@ -1,12 +1,11 @@
 {
   "name": "mcpsense-proxy",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Zero-config compatibility proxy bridging legacy stateful MCP servers to July 28, 2026 stateless clients",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "mcpsense-proxy": "bin/mcpsense-proxy.js",
-    "mcpsense-cloud": "bin/cloud/mcpsense-cloud.js"
+    "mcpsense-proxy": "bin/mcpsense-proxy.js"
   },
   "files": [
     "bin",
@@ -27,8 +26,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "commander": "^11.1.0",
-    "pino": "^9.1.0",
-    "stripe": "^17.7.0"
+    "pino": "^9.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
